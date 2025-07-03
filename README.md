@@ -1,4 +1,4 @@
-# react-native-hash-utils
+# react-native-file-hash
 **Cross-platform native hash utilities for React Native (MD5, SHA-256)**
 
 Simple and fast native hashing utilities for React Native.
@@ -6,6 +6,8 @@ Simple and fast native hashing utilities for React Native.
 Supports SHA-256 and MD5 hash calculation for local files on both iOS and Android, **without loading the entire file into memory**.
 
 Ideal for large files — hashing is performed in chunks directly from disk using native code.
+
+Modern API (CryptoKit in Swift, try-with-resources in Kotlin).
 
 ## Features
 
