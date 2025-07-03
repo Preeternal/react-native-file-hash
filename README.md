@@ -19,35 +19,76 @@ Modern API (CryptoKit in Swift, try-with-resources in Kotlin).
 
 ## Installation
 
-```bash
-npm install react-native-hash-utils
-```
-
-OR
+### Using npm
 
 ```bash
-yarn add react-native-hash-utils
+npm install react-native-file-hash
 ```
 
-## For iOS:
+### Using yarn
 
 ```bash
-cd ios && pod install
+yarn add react-native-file-hash
 ```
 
+### Using Bun
+
+```bash
+bun add react-native-file-hash
+```
+
+### Linking
+
+For React Native 0.60 and above, the module is linked automatically. For older versions, you might need to link it manually.
+
+## For iOS
+
+```bash
+cd ios && bundle exec pod install
+```
 
 ## Usage
 
 ```ts
-import HashUtils from 'react-native-hash-utils';
+import { getFileSha256, md5Hash } from 'react-native-file-hash';
 
-const hash = await HashUtils.getFileSha256('/path/to/file');
-console.log('SHA-256:', hash);
+// Get SHA-256 hash for a file
+try {
+  const sha256 = await getFileSha256('file:///path/to/your/file.txt');
+  console.log('SHA-256:', sha256);
+} catch (e) {
+  console.error(e);
+}
 
-const md5 = await HashUtils.md5Hash('/path/to/file');
-console.log('MD5:', md5);
+// Get MD5 hash for a file
+try {
+  const md5 = await md5Hash('file:///path/to/your/file.txt');
+  console.log('MD5:', md5);
+} catch (e) {
+  console.error(e);
+}
 ```
+
+## API
+
+### `getFileSha256(filePath: string): Promise<string>`
+
+Computes the SHA-256 hash of the file at the given `filePath`. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
+
+- **`filePath`**: The URI of the file.
+- **Returns**: A `Promise` that resolves with the SHA-256 hash string.
+
+### `md5Hash(filePath: string): Promise<string>`
+
+Computes the MD5 hash of the file at the given `filePath`. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
+
+- **`filePath`**: The URI of the file.
+- **Returns**: A `Promise` that resolves with the MD5 hash string.
+
+## Contributing
+
+Contributions are welcome! Please feel free to open an issue or submit a pull request.
+
 ## License
 
-MIT
-
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
