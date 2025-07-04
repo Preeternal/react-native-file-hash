@@ -1,6 +1,7 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "..", "package.json")))
+folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma -Wno-shorten-64-to-32'
 
 Pod::Spec.new do |s|
   s.name         = "FileHash"
@@ -9,17 +10,31 @@ Pod::Spec.new do |s|
   s.homepage     = package["homepage"]
   s.license      = package["license"]
   s.authors      = package["author"]
-  s.source       = { :git => package["repository"]["url"], :tag => s.version }
+  s.source       = { :git => package["repository"]["url"], :tag => "#{s.version}" }
 
-  s.ios.deployment_target = "11.0"
-  s.source_files = "FileHash.{h,m,swift}"
-  
-  # Для новой архитектуры
-  s.platforms    = { :ios => "12.4" }
+  s.platforms    = { :ios => "13.0" }
+  s.source_files = "ios/**/*.{h,m,mm,swift}"
+
+  # Этот блок необходим для правильной работы с новой архитектурой
   s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
+    "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
+    "DEFINES_MODULE" => "YES"
+  }
+  s.compiler_flags = folly_compiler_flags
+  s.xcconfig = {
     'SWIFT_VERSION' => '5.0'
   }
 
+  # Зависимости для обеих архитектур
   s.dependency "React-Core"
+
+  # Зависимости только для новой архитектуры
+  # Они будут добавлены автоматически, когда newArchEnabled=true
+  s.dependency "React-Codegen"
+  s.dependency "RCT-Folly"
+  s.dependency "RCTRequired"
+  s.dependency "RCTTypeSafety"
+  s.dependency "ReactCommon/turbomodule/core"
+
 end
