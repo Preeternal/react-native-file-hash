@@ -22,19 +22,19 @@ Modern API (CryptoKit in Swift, try-with-resources in Kotlin).
 ### Using npm
 
 ```bash
-npm install react-native-file-hash
+npm install @preeternal/react-native-file-hash
 ```
 
 ### Using yarn
 
 ```bash
-yarn add react-native-file-hash
+yarn add @preeternal/react-native-file-hash
 ```
 
 ### Using Bun
 
 ```bash
-bun add react-native-file-hash
+bun add @preeternal/react-native-file-hash
 ```
 
 ### Linking
