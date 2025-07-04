@@ -1,5 +1,7 @@
 {
   "cSpell.words": [
     "filehash"
-  ]
+  ],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
 }
