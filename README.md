@@ -50,7 +50,7 @@ cd ios && bundle exec pod install
 ## Usage
 
 ```ts
-import { getFileSha256, md5Hash } from 'react-native-file-hash';
+import { getFileSha256, md5Hash } from '@preeternal/react-native-file-hash';
 
 // Get SHA-256 hash for a file
 try {

@@ -1,4 +1,4 @@
-package com.preeternal.hash.utils
+package com.preeternal.filehash
 
 import com.facebook.react.TurboReactPackage
 import com.facebook.react.bridge.ReactApplicationContext
@@ -7,11 +7,11 @@ import com.facebook.react.uimanager.ViewManager
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
-class HashUtilsPackage : TurboReactPackage() {
+class FileHashPackage : TurboReactPackage() {
     
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
-        return if (name == "HashUtils") {
-            HashUtilsModule(reactContext)
+        return if (name == "FileHash") {
+            FileHashModule(reactContext)
         } else {
             null
         }
@@ -24,15 +24,15 @@ class HashUtilsPackage : TurboReactPackage() {
     override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
         return ReactModuleInfoProvider {
             val moduleInfo = ReactModuleInfo(
-                "HashUtils",           // Имя модуля (должно совпадать с JS частью)
-                "HashUtils",           // Имя класса, можно то же
+                "FileHash",           // Имя модуля (должно совпадать с JS частью)
+                "FileHash",           // Имя класса, можно то же
                 false,                 // canOverrideExistingModule
                 false,                 // needsEagerInit
                 true,                  // hasConstants
                 false,                 // isCxxModule
                 true                   // isTurboModule
             )
-            mapOf("HashUtils" to moduleInfo)
+            mapOf("FileHash" to moduleInfo)
         }
     }
 }

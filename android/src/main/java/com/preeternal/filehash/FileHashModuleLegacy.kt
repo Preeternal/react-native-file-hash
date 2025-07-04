@@ -1,4 +1,4 @@
-package com.preeternal.hash.utils
+package com.preeternal.filehash
 
 import com.facebook.react.bridge.*
 import java.io.File
@@ -6,10 +6,10 @@ import java.io.FileInputStream
 import java.security.MessageDigest
 
 @Suppress("unused")
-class HashUtilsModuleLegacy(reactContext: ReactApplicationContext) : 
+class FileHashModuleLegacy(reactContext: ReactApplicationContext) : 
     ReactContextBaseJavaModule(reactContext) {
 
-    override fun getName(): String = "HashUtils"
+    override fun getName(): String = "FileHash"
 
     @ReactMethod
     fun getFileSha256(filePath: String, promise: Promise) {

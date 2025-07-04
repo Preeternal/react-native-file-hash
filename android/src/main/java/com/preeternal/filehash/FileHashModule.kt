@@ -1,16 +1,16 @@
-package com.preeternal.hash.utils
+package com.preeternal.filehash
 
 import com.facebook.react.bridge.*
-import com.preeternal.hash.utils.HashUtilsSpec
+import com.preeternal.filehash.FileHashSpec
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
 @Suppress("unused")
-class HashUtilsModule(reactContext: ReactApplicationContext) : 
-    ReactContextBaseJavaModule(reactContext), HashUtilsSpec {
+class FileHashModule(reactContext: ReactApplicationContext) : 
+    ReactContextBaseJavaModule(reactContext), FileHashSpec {
 
-    override fun getName(): String = "HashUtils"
+    override fun getName(): String = "FileHash"
 
     @ReactMethod
     override fun getFileSha256(filePath: String, promise: Promise) {

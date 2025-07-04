@@ -1,5 +1,5 @@
 {
-  "name": "@preeternal/react-native-hash-utils",
+  "name": "@preeternal/react-native-file-hash",
   "version": "0.0.1",
   "description": "Native fast hash utilities (SHA-256, MD5) for React Native. No UI freezes, supports both old and new architecture (TurboModules ready).",
   "main": "src/index.ts",
@@ -11,24 +11,26 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Preeternal/react-native-hash-utils.git"
+    "url": "https://github.com/Preeternal/react-native-file-hash.git"
   },
   "keywords": [
     "react-native",
+    "file",
     "hash",
     "md5",
     "sha256",
     "native",
     "turbo-module",
     "react-native-module",
+    "native-module",
     "preeternal"
   ],
   "author": "Preeternal",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Preeternal/react-native-hash-utils/issues"
+    "url": "https://github.com/Preeternal/react-native-file-hash/issues"
   },
-  "homepage": "https://github.com/Preeternal/react-native-hash-utils#readme",
+  "homepage": "https://github.com/Preeternal/react-native-file-hash#readme",
   "peerDependencies": {
     "react-native": ">=0.72.0"
   },
@@ -36,12 +38,17 @@
     "typescript": "^5.0.0",
     "eslint": "^8.19.0"
   },
+  "codegenConfig": {
+    "name": "FileHashSpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  },
   "react-native": {
     "android": {
       "sourceDir": "android"
     },
     "ios": {
-      "podspecPath": "ios/HashUtils.podspec"
+      "podspecPath": "ios/FileHash.podspec"
     }
   }
 }
