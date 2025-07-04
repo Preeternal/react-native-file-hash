@@ -8,7 +8,7 @@ import com.facebook.react.module.model.ReactModuleInfoProvider
 
 class FileHashPackage : TurboReactPackage() {
     
-    // Этот метод вызывается для НОВОЙ архитектуры
+    // new arch
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
         return if (name == "FileHash") {
             FileHashModule(reactContext)
@@ -17,16 +17,17 @@ class FileHashPackage : TurboReactPackage() {
         }
     }
 
-    // Этот метод будет вызван для СТАРОЙ архитектуры
+    // old arch
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(FileHashModuleLegacy(reactContext))
+        return listOf(FileHashModule(reactContext))
     }
 
+    // new arch
     override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
         return ReactModuleInfoProvider {
             val moduleInfo = ReactModuleInfo(
-                "FileHash",           // Имя модуля
-                "com.preeternal.filehash.FileHashModule", // Имя класса
+                "FileHash",           // module name
+                "com.preeternal.filehash.FileHashModule", // class name
                 false,                 // canOverrideExistingModule
                 false,                 // needsEagerInit
                 true,                  // hasConstants
