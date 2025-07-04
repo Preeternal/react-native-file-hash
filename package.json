@@ -32,9 +32,11 @@
   },
   "homepage": "https://github.com/Preeternal/react-native-file-hash#readme",
   "peerDependencies": {
+    "react": "*",
     "react-native": ">=0.72.0"
   },
   "devDependencies": {
+    "@types/react": "^19.0.0",
     "typescript": "^5.0.0",
     "eslint": "^8.19.0"
   },

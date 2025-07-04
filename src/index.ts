@@ -1,4 +1,3 @@
-// filepath: src/index.ts
 import { NativeModules, Platform } from 'react-native';
 
 const LINKING_ERROR =
