@@ -6,4 +6,4 @@ export interface Spec extends TurboModule {
     md5Hash(filePath: string): Promise<string>;
 }
 
-export default TurboModuleRegistry.get<Spec>('FileHash');
+export default TurboModuleRegistry.getEnforcing<Spec>('FileHash');

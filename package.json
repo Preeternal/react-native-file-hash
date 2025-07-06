@@ -1,59 +1,52 @@
 {
-  "name": "@preeternal/react-native-file-hash",
-  "version": "0.0.1",
-  "description": "Native fast hash utilities (SHA-256, MD5) for React Native. No UI freezes, supports both old and new architecture (TurboModules ready).",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "scripts": {
-    "lint": "eslint .",
-    "build": "tsc",
-    "prepare": "bun run build"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Preeternal/react-native-file-hash.git"
-  },
-  "keywords": [
-    "react-native",
-    "file",
-    "hash",
-    "md5",
-    "sha256",
-    "native",
-    "turbo-module",
-    "react-native-module",
-    "native-module",
-    "preeternal"
-  ],
-  "author": "Preeternal",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Preeternal/react-native-file-hash/issues"
-  },
-  "homepage": "https://github.com/Preeternal/react-native-file-hash#readme",
-  "peerDependencies": {
-    "react": "*",
-    "react-native": ">=0.72.0"
-  },
-  "devDependencies": {
-    "@react-native/babel-preset": "^0.80.1",
-    "@react-native/eslint-config": "^0.80.1",
-    "@types/react": "^19.0.0",
-    "eslint": "^8.19.0",
-    "prettier": "^3.6.2",
-    "typescript": "^5.0.0"
-  },
-  "codegenConfig": {
-    "name": "FileHashSpec",
-    "type": "modules",
-    "jsSrcsDir": "src"
-  },
-  "react-native": {
-    "android": {
-      "sourceDir": "android"
+    "name": "@preeternal/react-native-file-hash",
+    "version": "0.0.1",
+    "description": "Native fast hash utilities (SHA-256, MD5) for React Native. No UI freezes, supports both old and new architecture (TurboModules ready).",
+    "source": "src/index.ts",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "scripts": {
+        "lint": "eslint .",
+        "build": "tsc",
+        "prepare": "bun run build"
     },
-    "ios": {
-      "podspecPath": "ios/FileHash.podspec"
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Preeternal/react-native-file-hash.git"
+    },
+    "keywords": [
+        "react-native",
+        "file",
+        "hash",
+        "md5",
+        "sha256",
+        "native",
+        "turbo-module",
+        "react-native-module",
+        "native-module",
+        "preeternal"
+    ],
+    "author": "Preeternal",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/Preeternal/react-native-file-hash/issues"
+    },
+    "homepage": "https://github.com/Preeternal/react-native-file-hash#readme",
+    "peerDependencies": {
+        "react": "*",
+        "react-native": ">=0.72.0"
+    },
+    "devDependencies": {
+        "@react-native/babel-preset": "^0.80.1",
+        "@react-native/eslint-config": "^0.80.1",
+        "@types/react": "^19.0.0",
+        "eslint": "^8.19.0",
+        "prettier": "^3.6.2",
+        "typescript": "^5.0.0"
+    },
+    "codegenConfig": {
+        "name": "FileHashSpec",
+        "type": "modules",
+        "jsSrcsDir": "src"
     }
-  }
 }

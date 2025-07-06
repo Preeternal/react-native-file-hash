@@ -1,5 +1,4 @@
 import { NativeModules, Platform } from 'react-native';
-import FileHashSpec, { type Spec } from './FileHashSpec';
 
 const LINKING_ERROR =
     `The package '@preeternal/react-native-file-hash' doesn't seem to be linked. Make sure: \n\n` +
@@ -10,16 +9,23 @@ const LINKING_ERROR =
     '- You rebuilt the app after installing the package\n' +
     '- You are not using Expo Go\n';
 
-const FileHash = (FileHashSpec ??
-    NativeModules.FileHash ??
-    new Proxy(
-        {},
-        {
-            get() {
-                throw new Error(LINKING_ERROR);
-            },
-        },
-    )) as Spec;
+// @ts-expect-error
+const isTurboModuleEnabled = global.__turboModuleProxy != null;
+
+const FileHashModule = isTurboModuleEnabled
+    ? require('./FileHashSpec').default
+    : NativeModules.FileHash;
+
+const FileHash = FileHashModule
+    ? FileHashModule
+    : new Proxy(
+          {},
+          {
+              get() {
+                  throw new Error(LINKING_ERROR);
+              },
+          },
+      );
 
 export function getFileSha256(filePath: string): Promise<string> {
     return FileHash.getFileSha256(filePath);

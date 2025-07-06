@@ -38,7 +38,11 @@ bower_components
 build/Release
 
 # Dependency directories
+# node.js
+#
 node_modules/
+npm-debug.log
+yarn-error.log
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -140,3 +144,40 @@ vite.config.ts.timestamp-*
 
 # React Native Packager
 /lib
+
+# OSX
+#
+.DS_Store
+
+# Xcode
+#
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+**/.xcode.env.local
+
+# Android/IntelliJ
+#
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+*.keystore
+!debug.keystore
+.kotlin/

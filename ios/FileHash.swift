@@ -4,7 +4,7 @@ import React
 
 #if RCT_NEW_ARCH_ENABLED
     @objc
-    protocol HashUtilsSpec: RCTBridgeModule {
+    protocol FileHashSpec: RCTBridgeModule {
         @objc
         func md5Hash(_ filePath: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock)
 
@@ -13,16 +13,16 @@ import React
     }
 #endif
 
-@objc(HashUtils)
-class HashUtils: NSObject, RCTBridgeModule {
+@objc(FileHash)
+class FileHash: NSObject, RCTBridgeModule {
 #if RCT_NEW_ARCH_ENABLED
     @objc
     static func moduleName() -> String! {
-        return "HashUtils"
+        return "FileHash"
     }
 #else
     static func moduleName() -> String! {
-        return "HashUtils"
+        return "FileHash"
     }
 #endif
 
@@ -85,5 +85,5 @@ class HashUtils: NSObject, RCTBridgeModule {
 }
 
 #if RCT_NEW_ARCH_ENABLED
-extension HashUtils: HashUtilsSpec {}
+extension FileHash: FileHashSpec {}
 #endif
