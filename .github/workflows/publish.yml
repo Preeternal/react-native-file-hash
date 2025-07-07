@@ -1,23 +1,20 @@
-# .github/workflows/publish.yml
-
-name: Publish Package to npm and GitHub Packages
+name: Publish Package to npmjs.com and GitHub Packages
 
 on:
     release:
-        types: [created] # Запускать только при создании нового релиза
+        types: [published]
 
 jobs:
-    publish:
+    build-and-publish:
         runs-on: ubuntu-latest
         permissions:
             contents: read
-            packages: write # Даем разрешение на запись в GitHub Packages
+            packages: write
 
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            # Устанавливаем Bun для сборки
             - name: Setup Bun
               uses: oven-sh/setup-bun@v1
 
@@ -27,19 +24,17 @@ jobs:
             - name: Build package
               run: bun run build
 
-            # --- Публикация на NPM ---
-            - name: Setup Node.js for npm
+            - name: Setup Node.js for npmjs.com
               uses: actions/setup-node@v4
               with:
                   node-version: '18.x'
                   registry-url: 'https://registry.npmjs.org'
 
-            - name: Publish to npm
+            - name: Publish to npmjs.com
               run: npm publish --access public
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-            # --- Публикация на GitHub Packages ---
             - name: Setup Node.js for GitHub Packages
               uses: actions/setup-node@v4
               with:
