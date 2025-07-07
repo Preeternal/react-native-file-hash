@@ -44,7 +44,7 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: '18.x'
-                  # URL реестра теперь будет взят из файла .npmrc
+                  registry-url: 'https://npm.pkg.github.com'
 
             - name: Publish to GitHub Packages
               run: npm publish
