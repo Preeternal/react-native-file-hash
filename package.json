@@ -1,6 +1,6 @@
 {
     "name": "@preeternal/react-native-file-hash",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Native fast hash utilities (SHA-256, MD5) for React Native. No UI freezes, supports both old and new architecture (TurboModules ready).",
     "source": "src/index.ts",
     "main": "lib/index.js",
