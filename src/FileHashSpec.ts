@@ -1,9 +1,9 @@
 import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
+export type THashAlgorithm = 'MD5' | 'SHA-256';
 export interface Spec extends TurboModule {
-    getFileSha256(filePath: string): Promise<string>;
-    md5Hash(filePath: string): Promise<string>;
+    fileHash(filePath: string, algorithm: THashAlgorithm): Promise<string>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('FileHash');

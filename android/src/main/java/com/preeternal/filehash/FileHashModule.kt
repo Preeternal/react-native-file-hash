@@ -10,16 +10,7 @@ class FileHashModule(reactContext: ReactApplicationContext) : FileHashSpec(react
     override fun getName(): String = "FileHash"
 
     @ReactMethod
-    override fun getFileSha256(filePath: String, promise: Promise) {
-        hashFile(filePath, "SHA-256", promise)
-    }
-
-    @ReactMethod
-    override fun md5Hash(filePath: String, promise: Promise) {
-        hashFile(filePath, "MD5", promise)
-    }
-
-    private fun hashFile(filePath: String, algorithm: String, promise: Promise) {
+    override fun fileHash(filePath: String, algorithm: String, promise: Promise) {
         try {
             val fileUri = filePath.removePrefix("file://")
             val file = File(fileUri)
@@ -41,9 +32,9 @@ class FileHashModule(reactContext: ReactApplicationContext) : FileHashSpec(react
             val hexString = hashBytes.joinToString("") { "%02x".format(it) }
             promise.resolve(hexString)
         } catch (e: Exception) {
-            promise.reject("E_HASH_FAILED", "Failed to compute hash", e)
+            promise.reject("E_HASH_FAILED", "Failed to compute hash for algorithm $algorithm", e)
         }
     }
-    
+
     override fun invalidate() {}
 }

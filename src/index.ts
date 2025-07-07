@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import { Spec, THashAlgorithm } from './FileHashSpec';
 
 const LINKING_ERROR =
     `The package '@preeternal/react-native-file-hash' doesn't seem to be linked. Make sure: \n\n` +
@@ -27,10 +28,17 @@ const FileHash = FileHashModule
           },
       );
 
-export function getFileSha256(filePath: string): Promise<string> {
-    return FileHash.getFileSha256(filePath);
+/**
+ * Calculates the hash of a file.
+ * @param filePath The path to the file.
+ * @param algorithm The hash algorithm to use.
+ * @returns A promise that resolves with the hex-encoded hash string.
+ */
+export function fileHash(
+    filePath: string,
+    algorithm: THashAlgorithm = 'SHA-256',
+): Promise<string> {
+    return (FileHash as Spec).fileHash(filePath, algorithm);
 }
 
-export function md5Hash(filePath: string): Promise<string> {
-    return FileHash.md5Hash(filePath);
-}
+export type { THashAlgorithm };

@@ -2,11 +2,9 @@
 
 @interface RCT_EXTERN_MODULE(FileHash, NSObject)
 
-RCT_EXTERN_METHOD(md5Hash:(NSString *)filePath
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(getFileSha256:(NSString *)filePath
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(fileHash:(NSString *)filePath
+                  algorithm:(NSString *)algorithm
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 
 @end

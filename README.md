@@ -1,4 +1,5 @@
 # react-native-file-hash
+
 **Cross-platform native hash utilities for React Native (MD5, SHA-256)**
 
 Simple and fast native hashing utilities for React Native.
@@ -50,40 +51,38 @@ cd ios && bundle exec pod install
 ## Usage
 
 ```ts
-import { getFileSha256, md5Hash } from '@preeternal/react-native-file-hash';
+import { fileHash, THashAlgorithm } from '@preeternal/react-native-file-hash';
 
 // Get SHA-256 hash for a file
 try {
-  const sha256 = await getFileSha256('file:///path/to/your/file.txt');
-  console.log('SHA-256:', sha256);
+    const sha256 = await fileHash('file:///path/to/your/file.txt', 'SHA-256');
+    console.log('SHA-256:', sha256);
 } catch (e) {
-  console.error(e);
+    console.error(e);
 }
 
 // Get MD5 hash for a file
 try {
-  const md5 = await md5Hash('file:///path/to/your/file.txt');
-  console.log('MD5:', md5);
+    const md5 = await fileHash('file:///path/to/your/file.txt', 'MD5');
+    console.log('MD5:', md5);
 } catch (e) {
-  console.error(e);
+    console.error(e);
 }
 ```
 
 ## API
 
-### `getFileSha256(filePath: string): Promise<string>`
+### `fileHash(filePath: string, algorithm: THashAlgorithm): Promise<string>`
 
-Computes the SHA-256 hash of the file at the given `filePath`. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
-
-- **`filePath`**: The URI of the file.
-- **Returns**: A `Promise` that resolves with the SHA-256 hash string.
-
-### `md5Hash(filePath: string): Promise<string>`
-
-Computes the MD5 hash of the file at the given `filePath`. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
+Computes the hash of the file at the given `filePath` using the specified algorithm. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
 
 - **`filePath`**: The URI of the file.
-- **Returns**: A `Promise` that resolves with the MD5 hash string.
+- **`algorithm`**: The hash algorithm to use. Can be `'SHA-256'` (default) or `'MD5'`.
+- **Returns**: A `Promise` that resolves with the hash string.
+
+### `THashAlgorithm`
+
+A type representing the supported hash algorithms: `'SHA-256' | 'MD5'`.
 
 ## Contributing
 
