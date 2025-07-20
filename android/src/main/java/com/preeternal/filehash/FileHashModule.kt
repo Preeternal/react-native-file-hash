@@ -1,13 +1,20 @@
 package com.preeternal.filehash
 
-import com.facebook.react.bridge.*
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.module.annotations.ReactModule
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
-class FileHashModule(reactContext: ReactApplicationContext) : FileHashSpec(reactContext) {
-
-    override fun getName(): String = "FileHash"
+@ReactModule(name = FileHashModule.NAME)
+class FileHashModule(reactContext: ReactApplicationContext) : 
+    NativeFileHashSpec(reactContext) {
+    
+    override fun getName(): String {
+        return NAME
+    }
 
     @ReactMethod
     override fun fileHash(filePath: String, algorithm: String, promise: Promise) {
@@ -36,5 +43,7 @@ class FileHashModule(reactContext: ReactApplicationContext) : FileHashSpec(react
         }
     }
 
-    override fun invalidate() {}
+    companion object {
+        const val NAME = "FileHash"
+    }
 }

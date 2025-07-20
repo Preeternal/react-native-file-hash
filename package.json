@@ -47,6 +47,9 @@
     "codegenConfig": {
         "name": "FileHashSpec",
         "type": "modules",
-        "jsSrcsDir": "src"
+        "jsSrcsDir": "src",
+        "android": {
+            "javaPackageName": "com.preeternal.filehash"
+        }
     }
 }

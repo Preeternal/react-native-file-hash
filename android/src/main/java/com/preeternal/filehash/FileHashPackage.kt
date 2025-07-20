@@ -1,17 +1,33 @@
 package com.preeternal.filehash
 
-import com.facebook.react.ReactPackage
+import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.uimanager.ViewManager
-import java.util.Collections
+import com.facebook.react.module.model.ReactModuleInfo
+import com.facebook.react.module.model.ReactModuleInfoProvider
+import java.util.HashMap
 
-class FileHashPackage : ReactPackage {
-    override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(FileHashModule(reactContext))
+class FileHashPackage : BaseReactPackage() {
+    override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
+        return if (name == FileHashModule.NAME) {
+            FileHashModule(reactContext)
+        } else {
+            null
+        }
     }
 
-    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
-        return Collections.emptyList()
+    override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
+        return ReactModuleInfoProvider {
+            val moduleInfos: MutableMap<String, ReactModuleInfo> = HashMap()
+            moduleInfos[FileHashModule.NAME] = ReactModuleInfo(
+                FileHashModule.NAME,
+                FileHashModule.NAME,
+                canOverrideExistingModule = false,  // canOverrideExistingModule
+                needsEagerInit = false,  // needsEagerInit
+                isCxxModule = false,  // isCxxModule
+                isTurboModule = true // isTurboModule
+            )
+            moduleInfos
+        }
     }
 }
