@@ -13,6 +13,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => package["repository"]["url"], :tag => "#{s.version}" }
 
   s.platforms    = { :ios => "13.0" }
+  # Keep default module name derived from pod name to avoid breaking consumers
   s.source_files = "ios/**/*.{h,m,mm,swift}"
 
   # Объединяем конфигурацию в один блок для чистоты

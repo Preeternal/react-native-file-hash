@@ -1,4 +1,4 @@
-name: Publish Package to npmjs.com and GitHub Packages
+name: Publish Package to npmjs.com
 
 on:
     release:
@@ -34,14 +34,3 @@ jobs:
               run: npm publish --access public
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-            - name: Setup Node.js for GitHub Packages
-              uses: actions/setup-node@v4
-              with:
-                  node-version: '18.x'
-                  registry-url: 'https://npm.pkg.github.com'
-
-            - name: Publish to GitHub Packages
-              run: npm publish
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

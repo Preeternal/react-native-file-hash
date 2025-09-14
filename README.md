@@ -1,22 +1,26 @@
-# react-native-file-hash
+# @preeternal/react-native-file-hash
 
-**Cross-platform native hash utilities for React Native (MD5, SHA-256)**
+**Cross-platform native hash utilities for React Native (MD5, SHA-1, SHA-224, SHA-256, SHA-384, SHA-512)**
+
+[![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
+[![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 
 Simple and fast native hashing utilities for React Native.
 
-Supports SHA-256 and MD5 hash calculation for local files on both iOS and Android, **without loading the entire file into memory**.
+Supports MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512 hash calculation for local files on iOS and Android, **without loading the entire file into memory**.
 
 Ideal for large files — hashing is performed in chunks directly from disk using native code.
 
-Modern API (CryptoKit in Swift, try-with-resources in Kotlin).
+Modern API (CryptoKit & CommonCrypto in Swift, coroutines in Kotlin).
 
 ## Features
 
-- ✅ SHA-256 and MD5 hash for local files
+- ✅ MD5, SHA-1, SHA-224, SHA-256, SHA-384, SHA-512
 - ✅ High-performance native implementation
 - ✅ Does not load the entire file into memory
 - ✅ Prevents UI freezes
 - ✅ Supports both old and new React Native architecture (TurboModules ready)
+- ℹ️ Notes: SHA-224 uses CommonCrypto on iOS
 
 ## Installation
 
@@ -68,6 +72,12 @@ try {
 } catch (e) {
     console.error(e);
 }
+
+// Other algorithms
+await fileHash('file:///path/to/your/file.txt', 'SHA-1');
+await fileHash('file:///path/to/your/file.txt', 'SHA-224');
+await fileHash('file:///path/to/your/file.txt', 'SHA-384');
+await fileHash('file:///path/to/your/file.txt', 'SHA-512');
 ```
 
 ## API
@@ -77,12 +87,12 @@ try {
 Computes the hash of the file at the given `filePath` using the specified algorithm. The path must be a valid file URI (e.g., `file:///path/to/file` from an app-accessible location like `RNFS.DocumentDirectoryPath` from `react-native-fs`).
 
 - **`filePath`**: The URI of the file.
-- **`algorithm`**: The hash algorithm to use. Can be `'SHA-256'` (default) or `'MD5'`.
+- **`algorithm`**: The hash algorithm to use. One of `'MD5' | 'SHA-1' | 'SHA-224' | 'SHA-256' | 'SHA-384' | 'SHA-512'` (default `'SHA-256'`).
 - **Returns**: A `Promise` that resolves with the hash string.
 
 ### `THashAlgorithm`
 
-A type representing the supported hash algorithms: `'SHA-256' | 'MD5'`.
+A type representing the supported hash algorithms: `'MD5' | 'SHA-1' | 'SHA-224' | 'SHA-256' | 'SHA-384' | 'SHA-512'`.
 
 ## Contributing
 
