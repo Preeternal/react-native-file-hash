@@ -1,17 +1,20 @@
 buildscript {
-    ext.getExtOrDefault = {name ->
-        return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['FileHash_' + name]
-    }
+  ext.getExtOrDefault = {name ->
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['FileHash_' + name]
+  }
 
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.7.2")
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
-    }
+  repositories {
+    google()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath "com.android.tools.build:gradle:8.7.2"
+    // noinspection DifferentKotlinGradleVersion
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
+  }
 }
+
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
@@ -19,64 +22,66 @@ apply plugin: "kotlin-android"
 apply plugin: "com.facebook.react"
 
 def getExtOrIntegerDefault(name) {
-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["FileHash_" + name]).toInteger()
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["FileHash_" + name]).toInteger()
 }
 
 android {
-    
-    namespace "com.preeternal.filehash"
-    
-    compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+  namespace "com.preeternal.filehash"
 
-    defaultConfig {
-        minSdkVersion getExtOrIntegerDefault("minSdkVersion")
-        targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
-    }
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
 
-    buildFeatures {
-        buildConfig true
-    }
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
 
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
+    externalNativeBuild {
+      cmake {}
     }
+  }
 
-    lintOptions {
-        disable "GradleCompatible"
-    }
+  buildFeatures {
+    buildConfig true
+  }
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
     }
+  }
 
-    sourceSets {
-        main { 
-            java.srcDirs += [
-                "generated/java",
-                "generated/jni"
-            ]
-        }
+  buildTypes {
+    release {
+      minifyEnabled false
     }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += [
+        "generated/java",
+        "generated/jni"
+      ]
+    }
+  }
 }
 
 repositories {
-    mavenCentral()
-    google()
+  mavenCentral()
+  google()
 }
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
 dependencies {
-    implementation "com.facebook.react:react-native:+"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-}
-
-
-react {
-    jsRootDir = file("../src/")
-    libraryName = "FileHash"
-    codegenJavaPackageName = "com.preeternal.filehash"
+  implementation "com.facebook.react:react-android"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }

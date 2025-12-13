@@ -1,7 +1,8 @@
 {
-  "cSpell.words": [
-    "filehash"
-  ],
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "cSpell.words": ["filehash"],
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "files.associations": {
+        "FileHash.h": "objective-c"
+    }
 }
