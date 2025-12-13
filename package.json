@@ -1,6 +1,6 @@
 {
   "name": "@preeternal/react-native-file-hash",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "Native streaming hash for React Native: MD5, SHA-1/224/256/384/512, XXH3, BLAKE3 (hash/HMAC/keyed). TurboModules, no UI freezes.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
