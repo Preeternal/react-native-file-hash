@@ -35,6 +35,7 @@
     "example": "yarn workspace @preeternal/react-native-file-hash-example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bob build",
+    "prepack": "git submodule update --init --recursive",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "release": "release-it --only-version",
