@@ -88,3 +88,6 @@ nitrogen/
 
 # Copilot Instructions
 .github/copilot-instructions.md
+
+# Example
+example/ios/FileHashExample.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
