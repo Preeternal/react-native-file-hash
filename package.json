@@ -39,6 +39,7 @@
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "release": "release-it --only-version",
+    "check:16kb": "cd example/android && ./gradlew :app:assembleRelease && cd ../.. && bash scripts/check-16kb.sh",
     "test": "jest"
   },
   "keywords": [
