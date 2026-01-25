@@ -3,6 +3,11 @@ project(filehash_native)
 
 set(CMAKE_C_STANDARD 11)
 
+include(CheckLinkerFlag)
+
+set(FILEHASH_MAX_PAGE_SIZE_FLAG "-Wl,-z,max-page-size=16384")
+check_linker_flag(C "${FILEHASH_MAX_PAGE_SIZE_FLAG}" FILEHASH_LD_SUPPORTS_MAX_PAGE_SIZE)
+
 set(BLAKE3_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/blake3/c/blake3.c
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/blake3/c/blake3_dispatch.c
@@ -57,8 +62,12 @@ target_link_libraries(
   ${log-lib}
 )
 
-target_link_options(
-  filehash-native
-  PRIVATE
-  "-Wl,-z,max-page-size=16384"
-)
+if(FILEHASH_LD_SUPPORTS_MAX_PAGE_SIZE)
+  target_link_options(
+    filehash-native
+    PRIVATE
+    "${FILEHASH_MAX_PAGE_SIZE_FLAG}"
+  )
+else()
+  message(STATUS "filehash-native: linker does not support ${FILEHASH_MAX_PAGE_SIZE_FLAG}; building without 16KB alignment")
+endif()

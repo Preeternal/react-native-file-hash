@@ -81,6 +81,10 @@ For React Native 0.60 and above, the module is linked automatically. For older v
 cd ios && bundle exec pod install
 ```
 
+## For Android
+
+We enable 16KB page alignment when the linker supports `-Wl,-z,max-page-size=16384` to satisfy Google Play requirements on 16KB page size devices. Tested with NDK 27.1.x. If your NDK/toolchain does not recognize the flag, the build will continue without 16KB alignment, so upgrade your NDK to get 16KB-aligned binaries.
+
 ## Usage
 
 All functions are asynchronous and run on native background threads. They are safe to use with large files and will not block the UI.
