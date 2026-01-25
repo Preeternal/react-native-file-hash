@@ -56,3 +56,9 @@ target_link_libraries(
   filehash-native
   ${log-lib}
 )
+
+target_link_options(
+  filehash-native
+  PRIVATE
+  "-Wl,-z,max-page-size=16384"
+)
