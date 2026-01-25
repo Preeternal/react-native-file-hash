@@ -43,6 +43,7 @@ if [ -z "$readelf_cmd" ]; then
   exit 1
 fi
 
+readelf_args=(-l -W)
 files=()
 if command -v rg >/dev/null 2>&1; then
   rg_load_align() { rg -n "LOAD|Align"; }
@@ -62,7 +63,7 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 
 for so in "${files[@]}"; do
-  if ! "$readelf_cmd" -l "$so" | awk '
+  if ! "$readelf_cmd" "${readelf_args[@]}" "$so" | awk '
     $1=="LOAD" { load=1; if ($NF!="0x4000") bad=1 }
     END { if (!load) exit 2; exit bad }
   '; then
@@ -72,7 +73,7 @@ for so in "${files[@]}"; do
     else
       echo "ERROR: expected 16KB alignment (0x4000) for $so" >&2
     fi
-    "$readelf_cmd" -l "$so" | rg_load_align || true
+    "$readelf_cmd" "${readelf_args[@]}" "$so" | rg_load_align || true
     exit 1
   fi
 done
