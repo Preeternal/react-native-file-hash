@@ -131,28 +131,28 @@ public class FileHashImpl: NSObject {
     private func decodeKey(_ key: String, encoding: String?) -> Data? {
         let enc = (encoding ?? "utf8").lowercased()
         switch enc {
-        case "utf8":
-            return key.data(using: .utf8)
-        case "hex":
-            let cleaned = key.replacingOccurrences(of: " ", with: "")
-            guard cleaned.count % 2 == 0 else { return nil }
-            var data = Data(capacity: cleaned.count / 2)
-            var idx = cleaned.startIndex
-            while idx < cleaned.endIndex {
-                let nextIdx = cleaned.index(idx, offsetBy: 2)
-                let byteString = cleaned[idx..<nextIdx]
-                if let num = UInt8(byteString, radix: 16) {
-                    data.append(num)
-                } else {
-                    return nil
+            case "utf8":
+                return key.data(using: .utf8)
+            case "hex":
+                let cleaned = key.replacingOccurrences(of: " ", with: "")
+                guard cleaned.count % 2 == 0 else { return nil }
+                var data = Data(capacity: cleaned.count / 2)
+                var idx = cleaned.startIndex
+                while idx < cleaned.endIndex {
+                    let nextIdx = cleaned.index(idx, offsetBy: 2)
+                    let byteString = cleaned[idx..<nextIdx]
+                    if let num = UInt8(byteString, radix: 16) {
+                        data.append(num)
+                    } else {
+                        return nil
+                    }
+                    idx = nextIdx
                 }
-                idx = nextIdx
-            }
-            return data
-        case "base64":
-            return Data(base64Encoded: key)
-        default:
-            return nil
+                return data
+            case "base64":
+                return Data(base64Encoded: key)
+            default:
+                return nil
         }
     }
 

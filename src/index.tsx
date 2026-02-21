@@ -12,6 +12,7 @@ type HmacCapable = Extract<
     'SHA-224' | 'SHA-256' | 'SHA-384' | 'SHA-512'
 >;
 
+// TODO: replace this check into native-side validation
 const decodeKey = (
     key: string,
     encoding: TKeyEncoding = 'utf8'

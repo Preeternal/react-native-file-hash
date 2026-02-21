@@ -17,6 +17,7 @@ export type HashOptions = {
     mode?: THashMode;
     key?: string;
     keyEncoding?: TKeyEncoding;
+    // outputEncoding?: 'hex' | 'base64'; // TODO: Future option for output encoding
 };
 export interface Spec extends TurboModule {
     fileHash(
