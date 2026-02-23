@@ -7,6 +7,8 @@
       "env": ["ANDROID_HOME", "ORG_GRADLE_PROJECT_newArchEnabled"],
       "inputs": [
         "package.json",
+        ".gitmodules",
+        "third_party/**",
         "android",
         "!android/build",
         "src/*.ts",
@@ -17,7 +19,11 @@
         "!example/android/build",
         "!example/android/app/build"
       ],
-      "outputs": []
+      "outputs": [
+        "android/build/**/libfilehash-native.so",
+        "example/android/build/**/libfilehash-native.so",
+        "example/android/app/build/**/libfilehash-native.so"
+      ]
     },
     "build:ios": {
       "env": [
@@ -27,6 +33,8 @@
       ],
       "inputs": [
         "package.json",
+        ".gitmodules",
+        "third_party/**",
         "*.podspec",
         "ios",
         "src/*.ts",
