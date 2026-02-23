@@ -91,3 +91,6 @@ nitrogen/
 
 # Example
 example/ios/FileHashExample.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# Local notes
+submodule-notes.md
