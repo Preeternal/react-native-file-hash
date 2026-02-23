@@ -4,3 +4,6 @@
 [submodule "third_party/blake3"]
 	path = third_party/blake3
 	url = https://github.com/BLAKE3-team/BLAKE3.git
+[submodule "third_party/zig-files-hash"]
+	path = third_party/zig-files-hash
+	url = https://github.com/Preeternal/zig-files-hash.git
