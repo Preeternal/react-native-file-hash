@@ -364,13 +364,10 @@ jobs:
                   arch: x86_64
                   profile: pixel_6
                   disable-animations: true
+                  emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
                   script: |
-                      bash -euo pipefail <<'BASH'
-                      cd example/android
-                      ./gradlew :app:assembleRelease :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=x86_64 -Preact_native_file_hash_engine=${{ matrix.engine }}
-                      cd ../..
-                      bash scripts/maestro-runtime-smoke.sh ${{ matrix.engine }}
-                      BASH
+                      ./example/android/gradlew :app:assembleRelease :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=x86_64 -Preact_native_file_hash_engine=${{ matrix.engine }}
+                      bash ./scripts/maestro-runtime-smoke.sh ${{ matrix.engine }}
 
             - name: Upload Maestro artifacts (${{ matrix.engine }})
               if: always()
