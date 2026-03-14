@@ -102,7 +102,7 @@ jobs:
                   fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
                   NODE
 
-                  npx expo prebuild --platform all --clean --non-interactive --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
+                  CI=1 npx expo prebuild --platform all --clean --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
 
                   grep -q "^react_native_file_hash_engine=${ZFH_ENGINE}$" android/gradle.properties
                   grep -q "ENV\\['ZFH_ENGINE'\\] ||= '${ZFH_ENGINE}'" ios/Podfile

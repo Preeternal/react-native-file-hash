@@ -2,42 +2,66 @@ name: Setup Zig
 description: Download Zig and add it to PATH
 
 inputs:
-  version:
-    description: Zig version to install
-    required: false
-    default: '0.15.2'
+    version:
+        description: Zig version to install
+        required: false
+        default: '0.15.2'
 
 runs:
-  using: composite
-  steps:
-    - name: Install Zig
-      shell: bash
-      run: |
-        set -euo pipefail
+    using: composite
+    steps:
+        - name: Install Zig
+          shell: bash
+          run: |
+              set -euo pipefail
 
-        ZIG_VERSION="${{ inputs.version }}"
+              ZIG_VERSION="${{ inputs.version }}"
 
-        case "${{ runner.os }}" in
-          Linux)
-            ZIG_TARGET="x86_64-linux"
-            ;;
-          macOS)
-            ARCH="$(uname -m)"
-            if [[ "$ARCH" == "arm64" ]]; then
-              ZIG_TARGET="aarch64-macos"
-            else
-              ZIG_TARGET="x86_64-macos"
-            fi
-            ;;
-          *)
-            echo "Unsupported runner OS: ${{ runner.os }}" >&2
-            exit 1
-            ;;
-        esac
+              case "${{ runner.os }}" in
+                Linux)
+                  ARCHIVE_CANDIDATES=(
+                    "zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+                    "zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
+                  )
+                  ;;
+                macOS)
+                  ARCH="$(uname -m)"
+                  if [[ "$ARCH" == "arm64" ]]; then
+                    ARCHIVE_CANDIDATES=(
+                      "zig-aarch64-macos-${ZIG_VERSION}.tar.xz"
+                      "zig-macos-aarch64-${ZIG_VERSION}.tar.xz"
+                    )
+                  else
+                    ARCHIVE_CANDIDATES=(
+                      "zig-x86_64-macos-${ZIG_VERSION}.tar.xz"
+                      "zig-macos-x86_64-${ZIG_VERSION}.tar.xz"
+                    )
+                  fi
+                  ;;
+                *)
+                  echo "Unsupported runner OS: ${{ runner.os }}" >&2
+                  exit 1
+                  ;;
+              esac
 
-        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_TARGET}-${ZIG_VERSION}.tar.xz"
-        echo "Downloading Zig from: $ZIG_URL"
-        curl -fL --retry 3 "$ZIG_URL" -o "$RUNNER_TEMP/zig.tar.xz"
-        mkdir -p "$RUNNER_TEMP/zig"
-        tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
-        echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
+              rm -f "$RUNNER_TEMP/zig.tar.xz"
+              ZIG_URL=""
+              for archive in "${ARCHIVE_CANDIDATES[@]}"; do
+                candidate_url="https://ziglang.org/download/${ZIG_VERSION}/${archive}"
+                echo "Trying Zig URL: $candidate_url"
+                if curl -fL --retry 3 "$candidate_url" -o "$RUNNER_TEMP/zig.tar.xz"; then
+                  ZIG_URL="$candidate_url"
+                  break
+                fi
+                rm -f "$RUNNER_TEMP/zig.tar.xz"
+              done
+
+              if [[ -z "$ZIG_URL" ]]; then
+                echo "Failed to download Zig ${ZIG_VERSION} for ${{ runner.os }}" >&2
+                exit 1
+              fi
+
+              echo "Using Zig archive: $ZIG_URL"
+              mkdir -p "$RUNNER_TEMP/zig"
+              tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
+              echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"

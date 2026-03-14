@@ -1,10 +1,15 @@
-const {
-    createRunOncePlugin,
-    withAndroidGradleProperties,
-    withPodfile,
-} = require('@expo/config-plugins');
-
 const pkg = require('./package.json');
+let configPlugins;
+try {
+    configPlugins = require('@expo/config-plugins');
+} catch (error) {
+    if (error?.code !== 'MODULE_NOT_FOUND') {
+        throw error;
+    }
+    configPlugins = require('expo/config-plugins');
+}
+const { createRunOncePlugin, withAndroidGradleProperties, withPodfile } =
+    configPlugins;
 
 const PLUGIN_NAME = pkg.name;
 const VALID_ENGINES = new Set(['native', 'zig']);
