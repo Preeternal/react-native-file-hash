@@ -21,6 +21,49 @@ yarn
 
 > Since the project relies on Yarn workspaces, you cannot use [`npm`](https://github.com/npm/cli) for development without manually migrating.
 
+### Submodules and Zig prebuilts
+
+This repository vendors `xxHash`, `BLAKE3`, and `zig-files-hash` via git
+submodules. After cloning, run:
+
+```sh
+git submodule update --init --recursive
+```
+
+If you are changing Zig engine integration and need to refresh Zig prebuilts:
+
+```sh
+./scripts/build-zig-android.sh
+./scripts/build-zig-ios.sh
+```
+
+Prebuilt output locations:
+
+- `third_party/zig-files-hash-prebuilt/android/<ABI>/libzig_files_hash.a`
+- `third_party/zig-files-hash-prebuilt/ios/ZigFilesHash.xcframework`
+
+### Release builds on physical devices (native vs zig)
+
+Use these commands for manual smoke/performance verification in Release mode.
+Replace `"<IOS_DEVICE_NAME>"` with your actual iPhone device name.
+
+```sh
+# 1) Android / native / Release / physical device
+(cd example/android && ./gradlew :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a -Preact_native_file_hash_engine=native)
+
+# 2) Android / zig / Release / physical device
+./scripts/build-zig-android.sh && (cd example/android && ./gradlew :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a -Preact_native_file_hash_engine=zig)
+
+# 3) iOS / native / Release / physical device
+(cd example && ZFH_ENGINE=native bundle exec pod install --project-directory=ios && ZFH_ENGINE=native npx react-native run-ios --mode Release --device "<IOS_DEVICE_NAME>")
+
+# 4) iOS / zig / Release / physical device
+./scripts/build-zig-ios.sh && (cd example && ZFH_ENGINE=zig bundle exec pod install --project-directory=ios && ZFH_ENGINE=zig npx react-native run-ios --mode Release --device "<IOS_DEVICE_NAME>")
+```
+
+If you need a full clean rebuild, run `./gradlew clean` (Android) or clean the
+Xcode build folder before repeating the commands above.
+
 The [example app](/example/) demonstrates usage of the library. You need to run it to test any changes you make.
 
 It is configured to use the local version of the library, so any changes you make to the library's source code will be reflected in the example app. Changes to the library's JavaScript code will be reflected in the example app without a rebuild, but native code changes will require a rebuild of the example app.

@@ -25,6 +25,26 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["FileHash_" + name]).toInteger()
 }
 
+def fileHashEngine =
+  (project.findProperty("react_native_file_hash_engine")
+    ?: rootProject.findProperty("react_native_file_hash_engine")
+    ?: "native")
+    .toString()
+    .toLowerCase()
+
+def zigCoreVersion = "unknown"
+def zigCoreZon = file("../third_party/zig-files-hash/build.zig.zon")
+if (zigCoreZon.exists()) {
+  def match = (zigCoreZon.getText("UTF-8") =~ /version\s*=\s*"([^"]+)"/)
+  if (match.find()) {
+    zigCoreVersion = "v${match.group(1)}"
+  }
+}
+
+if (!(fileHashEngine in ["native", "zig"])) {
+  throw new GradleException("react_native_file_hash_engine must be 'native' or 'zig' (got '${fileHashEngine}')")
+}
+
 android {
   namespace "com.preeternal.filehash"
 
@@ -33,9 +53,13 @@ android {
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    buildConfigField "String", "FILE_HASH_ENGINE", "\"${fileHashEngine}\""
+    buildConfigField "String", "FILE_HASH_ZIG_CORE_VERSION", "\"${zigCoreVersion}\""
 
     externalNativeBuild {
-      cmake {}
+      cmake {
+        arguments "-DFILE_HASH_ENGINE=${fileHashEngine}"
+      }
     }
   }
 
@@ -84,4 +108,5 @@ def kotlin_version = getExtOrDefault("kotlinVersion")
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  testImplementation "junit:junit:4.13.2"
 }

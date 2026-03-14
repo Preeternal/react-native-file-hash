@@ -7,17 +7,31 @@ export type THashAlgorithm =
     | 'SHA-256'
     | 'SHA-384'
     | 'SHA-512'
+    | 'SHA-512/224'
+    | 'SHA-512/256'
     | 'XXH3-64'
     | 'XXH3-128'
-    | 'BLAKE3';
+    | 'BLAKE3'
+    | 'HMAC-SHA-224'
+    | 'HMAC-SHA-256'
+    | 'HMAC-SHA-384'
+    | 'HMAC-SHA-512'
+    | 'HMAC-MD5'
+    | 'HMAC-SHA-1';
 export type THashEncoding = 'utf8' | 'base64';
-export type THashMode = 'hash' | 'hmac' | 'keyed';
 export type TKeyEncoding = 'utf8' | 'hex' | 'base64';
 export type HashOptions = {
-    mode?: THashMode;
     key?: string;
     keyEncoding?: TKeyEncoding;
-    // outputEncoding?: 'hex' | 'base64'; // TODO: Future option for output encoding
+};
+export type RuntimeInfo = {
+    engine: 'native' | 'zig';
+};
+export type RuntimeDiagnostics = RuntimeInfo & {
+    zigApiVersion: number;
+    zigExpectedApiVersion: number;
+    zigApiCompatible: boolean;
+    zigVersion: string;
 };
 export interface Spec extends TurboModule {
     fileHash(
@@ -25,12 +39,14 @@ export interface Spec extends TurboModule {
         algorithm: THashAlgorithm,
         options?: HashOptions
     ): Promise<string>;
-    hashString(
+    stringHash(
         text: string,
         algorithm: THashAlgorithm,
         encoding?: THashEncoding,
         options?: HashOptions
     ): Promise<string>;
+    getRuntimeInfo(): Promise<RuntimeInfo>;
+    getRuntimeDiagnostics(): Promise<RuntimeDiagnostics>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('FileHash');

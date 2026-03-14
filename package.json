@@ -18,6 +18,7 @@
     "android",
     "ios",
     "third_party",
+    "app.plugin.js",
     "*.podspec",
     "react-native.config.js",
     "!ios/build",
@@ -40,7 +41,11 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "release": "release-it --only-version",
     "check:16kb": "cd example/android && ./gradlew :app:assembleRelease && cd ../.. && bash scripts/check-16kb.sh",
-    "test": "jest"
+    "compare:size:android": "bash scripts/compare-size-android.sh",
+    "compare:size:ios": "bash scripts/compare-size-ios.sh",
+    "test": "jest",
+    "test:e2e:maestro:native": "bash scripts/maestro-runtime-smoke.sh native",
+    "test:e2e:maestro:zig": "bash scripts/maestro-runtime-smoke.sh zig"
   },
   "keywords": [
     "react-native",
@@ -71,6 +76,11 @@
   "homepage": "https://github.com/Preeternal/react-native-file-hash#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
+  },
+  "expo": {
+    "plugins": [
+      "./app.plugin.js"
+    ]
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.8.1",
@@ -176,6 +186,9 @@
   },
   "jest": {
     "preset": "react-native",
+    "setupFiles": [
+      "<rootDir>/src/jest.setup.ts"
+    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"

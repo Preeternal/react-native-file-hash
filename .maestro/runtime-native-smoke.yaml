@@ -1,0 +1,10 @@
+appId: preeternal.reactnativefilehash.example
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "engine: native"
+    timeout: 15000
+- assertVisible:
+    id: "runtime-engine"
+    text: "engine: native"

@@ -1,18 +1,26 @@
 /* eslint-disable react-native/no-inline-styles */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     fileHash,
-    hashString,
+    getRuntimeDiagnostics,
+    getRuntimeInfo,
+    stringHash,
+    type RuntimeDiagnostics,
+    type RuntimeInfo,
     type THashAlgorithm,
     type THashEncoding,
-    type THashMode,
     type TKeyEncoding,
 } from '@preeternal/react-native-file-hash';
 import { keepLocalCopy, pick, types } from '@react-native-documents/picker';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+    SafeAreaProvider,
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Platform,
     Pressable,
     ScrollView,
@@ -38,9 +46,17 @@ const algorithms: THashAlgorithm[] = [
     'SHA-256',
     'SHA-384',
     'SHA-512',
+    'SHA-512/224',
+    'SHA-512/256',
     'XXH3-64',
     'XXH3-128',
     'BLAKE3',
+    'HMAC-SHA-224',
+    'HMAC-SHA-256',
+    'HMAC-SHA-384',
+    'HMAC-SHA-512',
+    'HMAC-MD5',
+    'HMAC-SHA-1',
 ];
 
 const formatBytes = (size?: number | null) => {
@@ -54,21 +70,37 @@ const formatBytes = (size?: number | null) => {
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`;
 };
 
-function App() {
+function AppContent() {
     const isDarkMode = useColorScheme() === 'dark';
+    const insets = useSafeAreaInsets();
     const [selectedAlgo, setSelectedAlgo] = useState<THashAlgorithm>('SHA-256');
     const [textInput, setTextInput] = useState<string>('hello world');
     const [textEncoding, setTextEncoding] = useState<THashEncoding>('utf8');
     const [textHash, setTextHash] = useState<string>('');
     const [textElapsedMs, setTextElapsedMs] = useState<number | null>(null);
     const [textLoading, setTextLoading] = useState(false);
-    const [mode, setMode] = useState<THashMode>('hash');
     const [key, setKey] = useState<string>('');
     const [keyEncoding, setKeyEncoding] = useState<TKeyEncoding>('utf8');
     const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
     const [hash, setHash] = useState<string>('');
     const [elapsedMs, setElapsedMs] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
+    const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
+    const [runtimeDiagnostics, setRuntimeDiagnostics] =
+        useState<RuntimeDiagnostics | null>(null);
+    const [runtimeInfoError, setRuntimeInfoError] = useState<string | null>(
+        null
+    );
+    const isHmacAlgorithm = selectedAlgo.startsWith('HMAC-');
+    const keyPlaceholder = (() => {
+        if (isHmacAlgorithm) {
+            return 'Enter HMAC key (can be empty)';
+        }
+        if (selectedAlgo === 'BLAKE3') {
+            return 'Enter 32-byte key for keyed BLAKE3 (optional)';
+        }
+        return 'Leave empty: key is unsupported for this algorithm';
+    })();
 
     const palette = useMemo(
         () =>
@@ -91,6 +123,61 @@ function App() {
                   },
         [isDarkMode]
     );
+
+    useEffect(() => {
+        let mounted = true;
+        getRuntimeInfo()
+            .then((info) => {
+                if (!mounted) return;
+                setRuntimeInfo(info);
+            })
+            .catch((error: any) => {
+                if (!mounted) return;
+                setRuntimeInfoError(error?.message ?? 'Failed to load');
+            });
+        getRuntimeDiagnostics()
+            .then((info) => {
+                if (!mounted) return;
+                setRuntimeDiagnostics(info);
+                setRuntimeInfoError(null);
+            })
+            .catch((error: any) => {
+                if (!mounted) return;
+                setRuntimeInfoError(error?.message ?? 'Failed to load');
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const zigCompatibilitySuffix =
+        runtimeDiagnostics?.engine === 'zig' &&
+        !runtimeDiagnostics.zigApiCompatible
+            ? ' (mismatch)'
+            : '';
+    const zigApiLabel =
+        runtimeDiagnostics?.engine === 'zig'
+            ? `${runtimeDiagnostics.zigApiVersion}/${runtimeDiagnostics.zigExpectedApiVersion}${zigCompatibilitySuffix}`
+            : 'n/a';
+    const zigVersionLabel =
+        runtimeDiagnostics?.engine === 'zig' &&
+        runtimeDiagnostics.zigVersion.trim().length > 0
+            ? runtimeDiagnostics.zigVersion
+            : 'n/a';
+    const showZigRuntimeDetails =
+        runtimeDiagnostics?.engine === 'zig' || runtimeInfo?.engine === 'zig';
+
+    const buildKeyOptions = () => {
+        if (!isHmacAlgorithm && key.length === 0) {
+            return undefined;
+        }
+
+        return {
+            key,
+            keyEncoding,
+        };
+    };
 
     const pickFile = async () => {
         try {
@@ -157,14 +244,7 @@ function App() {
         setLoading(true);
         setElapsedMs(null);
         try {
-            const options =
-                mode === 'hash'
-                    ? undefined
-                    : ({
-                          mode,
-                          key,
-                          keyEncoding,
-                      } as any);
+            const options = buildKeyOptions();
             const start = performance.now();
             const value = await fileHash(pickedFile.uri, selectedAlgo, options);
             const end = performance.now();
@@ -186,16 +266,9 @@ function App() {
         setTextLoading(true);
         setTextElapsedMs(null);
         try {
-            const options =
-                mode === 'hash'
-                    ? undefined
-                    : ({
-                          mode,
-                          key,
-                          keyEncoding,
-                      } as any);
+            const options = buildKeyOptions();
             const start = performance.now();
-            const value = await hashString(
+            const value = await stringHash(
                 textInput,
                 selectedAlgo,
                 textEncoding,
@@ -216,15 +289,74 @@ function App() {
     };
 
     return (
-        <SafeAreaProvider>
-            <SafeAreaView
-                style={[styles.container, { backgroundColor: palette.bg }]}
+        <SafeAreaView
+            style={[styles.container, { backgroundColor: palette.bg }]}
+        >
+            <StatusBar
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                backgroundColor={palette.bg}
+            />
+            <View
+                pointerEvents="none"
+                style={[
+                    styles.runtimeBadge,
+                    {
+                        top: insets.top,
+                        right: insets.right + 8,
+                        backgroundColor: isDarkMode
+                            ? 'rgba(23, 26, 32, 0.82)'
+                            : 'rgba(255, 255, 255, 0.82)',
+                        borderColor: palette.border,
+                    },
+                ]}
             >
-                <StatusBar
-                    barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                    backgroundColor={palette.bg}
-                />
-                <ScrollView contentContainerStyle={styles.scrollContent}>
+                <Text
+                    testID="runtime-engine"
+                    style={[styles.runtimeBadgeLine, { color: palette.text }]}
+                >
+                    engine: {runtimeInfo?.engine ?? '...'}
+                </Text>
+                {showZigRuntimeDetails ? (
+                    <>
+                        <Text
+                            testID="runtime-zig-abi"
+                            style={[
+                                styles.runtimeBadgeLine,
+                                { color: palette.muted },
+                            ]}
+                        >
+                            zig abi: {zigApiLabel}
+                        </Text>
+                        <Text
+                            testID="runtime-zig-version"
+                            style={[
+                                styles.runtimeBadgeLine,
+                                { color: palette.muted },
+                            ]}
+                        >
+                            zig: {zigVersionLabel}
+                        </Text>
+                    </>
+                ) : null}
+                {runtimeInfoError ? (
+                    <Text
+                        style={[styles.runtimeBadgeLine, { color: '#ef4444' }]}
+                    >
+                        err: {runtimeInfoError}
+                    </Text>
+                ) : null}
+            </View>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        { paddingBottom: insets.bottom + 20 },
+                    ]}
+                    keyboardShouldPersistTaps="handled"
+                >
                     <View style={styles.header}>
                         <Text style={[styles.title, { color: palette.text }]}>
                             File Hash
@@ -297,16 +429,33 @@ function App() {
                         <Text
                             style={[styles.cardTitle, { color: palette.text }]}
                         >
-                            2. Mode & Key (for file and string)
+                            2. Key (for file and string)
                         </Text>
+                        <TextInput
+                            style={[
+                                styles.input,
+                                {
+                                    color: palette.text,
+                                    borderColor: palette.border,
+                                    backgroundColor: isDarkMode
+                                        ? '#11151d'
+                                        : '#f5f7fb',
+                                },
+                            ]}
+                            placeholderTextColor={palette.muted}
+                            placeholder={keyPlaceholder}
+                            multiline
+                            value={key}
+                            onChangeText={setKey}
+                        />
                         <View style={styles.encodingRow}>
-                            {(['hash', 'hmac', 'keyed'] as THashMode[]).map(
-                                (m) => {
-                                    const active = mode === m;
+                            {(['utf8', 'hex', 'base64'] as TKeyEncoding[]).map(
+                                (enc) => {
+                                    const active = keyEncoding === enc;
                                     return (
                                         <Pressable
-                                            key={m}
-                                            onPress={() => setMode(m)}
+                                            key={enc}
+                                            onPress={() => setKeyEncoding(enc)}
                                             style={[
                                                 styles.chip,
                                                 {
@@ -327,80 +476,13 @@ function App() {
                                                         : '500',
                                                 }}
                                             >
-                                                {m.toUpperCase()}
+                                                {enc.toUpperCase()}
                                             </Text>
                                         </Pressable>
                                     );
                                 }
                             )}
                         </View>
-                        {mode !== 'hash' && (
-                            <>
-                                <TextInput
-                                    style={[
-                                        styles.input,
-                                        {
-                                            color: palette.text,
-                                            borderColor: palette.border,
-                                            backgroundColor: isDarkMode
-                                                ? '#11151d'
-                                                : '#f5f7fb',
-                                        },
-                                    ]}
-                                    placeholderTextColor={palette.muted}
-                                    placeholder={
-                                        mode === 'keyed'
-                                            ? 'Enter 32-byte key (utf8/hex/base64)'
-                                            : 'Enter key'
-                                    }
-                                    multiline
-                                    value={key}
-                                    onChangeText={setKey}
-                                />
-                                <View style={styles.encodingRow}>
-                                    {(
-                                        [
-                                            'utf8',
-                                            'hex',
-                                            'base64',
-                                        ] as TKeyEncoding[]
-                                    ).map((enc) => {
-                                        const active = keyEncoding === enc;
-                                        return (
-                                            <Pressable
-                                                key={enc}
-                                                onPress={() =>
-                                                    setKeyEncoding(enc)
-                                                }
-                                                style={[
-                                                    styles.chip,
-                                                    {
-                                                        backgroundColor: active
-                                                            ? palette.accent
-                                                            : 'transparent',
-                                                        borderColor:
-                                                            palette.border,
-                                                    },
-                                                ]}
-                                            >
-                                                <Text
-                                                    style={{
-                                                        color: active
-                                                            ? '#0b1120'
-                                                            : palette.text,
-                                                        fontWeight: active
-                                                            ? '700'
-                                                            : '500',
-                                                    }}
-                                                >
-                                                    {enc.toUpperCase()}
-                                                </Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                            </>
-                        )}
                     </View>
 
                     <View
@@ -480,11 +562,7 @@ function App() {
                                     opacity: pickedFile && !loading ? 1 : 0.6,
                                 },
                             ]}
-                            disabled={
-                                !pickedFile ||
-                                loading ||
-                                (mode !== 'hash' && key.trim().length === 0)
-                            }
+                            disabled={!pickedFile || loading}
                             onPress={handleHash}
                         >
                             {loading ? (
@@ -509,8 +587,19 @@ function App() {
                                         styles.resultText,
                                         { color: palette.text },
                                     ]}
+                                    selectable
+                                    testID="file-hash-result"
                                 >
                                     {hash}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.resultLabel,
+                                        styles.resultHint,
+                                        { color: palette.muted },
+                                    ]}
+                                >
+                                    Long press the hex digest to copy it.
                                 </Text>
                                 {elapsedMs != null && (
                                     <Text
@@ -610,11 +699,7 @@ function App() {
                                         textInput && !textLoading ? 1 : 0.6,
                                 },
                             ]}
-                            disabled={
-                                !textInput ||
-                                textLoading ||
-                                (mode !== 'hash' && key.trim().length === 0)
-                            }
+                            disabled={!textInput || textLoading}
                             onPress={handleHashString}
                         >
                             {textLoading ? (
@@ -641,8 +726,19 @@ function App() {
                                         styles.resultText,
                                         { color: palette.text },
                                     ]}
+                                    selectable
+                                    testID="string-hash-result"
                                 >
                                     {textHash}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.resultLabel,
+                                        styles.resultHint,
+                                        { color: palette.muted },
+                                    ]}
+                                >
+                                    Long press the hex digest to copy it.
                                 </Text>
                                 {textElapsedMs != null && (
                                     <Text
@@ -669,7 +765,15 @@ function App() {
                         )}
                     </View>
                 </ScrollView>
-            </SafeAreaView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}
+
+function App() {
+    return (
+        <SafeAreaProvider>
+            <AppContent />
         </SafeAreaProvider>
     );
 }
@@ -764,6 +868,12 @@ const styles = StyleSheet.create({
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
         lineHeight: 20,
     },
+    resultHint: {
+        marginTop: 4,
+        marginBottom: 2,
+        fontSize: 11,
+        lineHeight: 15,
+    },
     scrollContent: {
         paddingBottom: 20,
     },
@@ -774,6 +884,19 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         textAlignVertical: 'top',
         marginBottom: 8,
+    },
+    runtimeBadge: {
+        position: 'absolute',
+        zIndex: 10,
+        borderWidth: 1,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        minWidth: 132,
+    },
+    runtimeBadgeLine: {
+        fontSize: 11,
+        lineHeight: 15,
     },
 });
 

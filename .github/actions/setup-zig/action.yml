@@ -1,0 +1,42 @@
+name: Setup Zig
+description: Download Zig and add it to PATH
+
+inputs:
+  version:
+    description: Zig version to install
+    required: false
+    default: '0.15.2'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Zig
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        ZIG_VERSION="${{ inputs.version }}"
+
+        case "${{ runner.os }}" in
+          Linux)
+            ZIG_TARGET="linux-x86_64"
+            ;;
+          macOS)
+            ARCH="$(uname -m)"
+            if [[ "$ARCH" == "arm64" ]]; then
+              ZIG_TARGET="aarch64-macos"
+            else
+              ZIG_TARGET="x86_64-macos"
+            fi
+            ;;
+          *)
+            echo "Unsupported runner OS: ${{ runner.os }}" >&2
+            exit 1
+            ;;
+        esac
+
+        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_TARGET}-${ZIG_VERSION}.tar.xz"
+        curl -L "$ZIG_URL" -o "$RUNNER_TEMP/zig.tar.xz"
+        mkdir -p "$RUNNER_TEMP/zig"
+        tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
+        echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"

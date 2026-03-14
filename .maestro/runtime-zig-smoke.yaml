@@ -1,0 +1,15 @@
+appId: preeternal.reactnativefilehash.example
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "engine: zig"
+    timeout: 15000
+- assertVisible:
+    id: "runtime-engine"
+    text: "engine: zig"
+- assertVisible:
+    id: "runtime-zig-abi"
+- assertNotVisible: "(mismatch)"
+- assertVisible:
+    id: "runtime-zig-version"

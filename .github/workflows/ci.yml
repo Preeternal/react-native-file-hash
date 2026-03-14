@@ -1,171 +1,582 @@
 name: CI
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
-  merge_group:
-    types:
-      - checks_requested
+    push:
+        branches:
+            - main
+            - master
+    pull_request:
+        branches:
+            - main
+            - master
+    merge_group:
+        types:
+            - checks_requested
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+    lint:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Setup
-        uses: ./.github/actions/setup
+            - name: Setup
+              uses: ./.github/actions/setup
 
-      - name: Lint files
-        run: yarn lint
+            - name: Lint files
+              run: yarn lint
 
-      - name: Typecheck files
-        run: yarn typecheck
+            - name: Typecheck files
+              run: yarn typecheck
 
-  test:
-    runs-on: ubuntu-latest
+    test:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Setup
-        uses: ./.github/actions/setup
+            - name: Setup
+              uses: ./.github/actions/setup
 
-      - name: Run unit tests
-        run: yarn test --maxWorkers=2 --coverage
+            - name: Run unit tests
+              run: yarn test --maxWorkers=2 --coverage
 
-  build-library:
-    runs-on: ubuntu-latest
+    build-library:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Setup
-        uses: ./.github/actions/setup
+            - name: Setup
+              uses: ./.github/actions/setup
 
-      - name: Build package
-        run: yarn prepare
+            - name: Build package
+              run: yarn prepare
 
-  build-android:
-    runs-on: ubuntu-latest
-
-    env:
-      TURBO_CACHE_DIR: .turbo/android
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Cache turborepo for Android
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turborepo-android-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
-          restore-keys: |
-            ${{ runner.os }}-turborepo-android-
-
-      - name: Check turborepo cache for Android
-        run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
-
-          if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
-            echo "turbo_cache_hit=1" >> $GITHUB_ENV
-          fi
-
-      - name: Install JDK
-        if: env.turbo_cache_hit != 1
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Finalize Android SDK
-        if: env.turbo_cache_hit != 1
-        run: |
-          /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
-
-      - name: Cache Gradle
-        if: env.turbo_cache_hit != 1
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: |
-            ~/.gradle/wrapper
-            ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Build example for Android
+    expo-prebuild:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                engine: [native, zig]
         env:
-          JAVA_OPTS: "-XX:MaxHeapSize=6g"
-        run: |
-          yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+            EXPO_WORK_DIR: ${{ github.workspace }}/.tmp/expo-prebuild-${{ matrix.engine }}
 
-      - name: Verify 16KB page alignment
-        run: bash scripts/check-16kb.sh
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-  build-ios:
-    runs-on: macos-latest
+            - name: Setup Node.js
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+              with:
+                  node-version-file: .nvmrc
 
-    env:
-      XCODE_VERSION: latest-stable
-      TURBO_CACHE_DIR: .turbo/ios
-      RCT_USE_RN_DEP: 1
-      RCT_USE_PREBUILT_RNCORE: 1
+            - name: Init submodules
+              run: git submodule update --init --recursive
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+            - name: Expo prebuild smoke test (${{ matrix.engine }} engine)
+              env:
+                  ZFH_ENGINE: ${{ matrix.engine }}
+              run: |
+                  set -euo pipefail
 
-      - name: Setup
-        uses: ./.github/actions/setup
+                  PACKAGE_TGZ="$(npm pack --silent --ignore-scripts | tail -n1)"
+                  rm -rf "$EXPO_WORK_DIR"
+                  mkdir -p "$EXPO_WORK_DIR"
 
-      - name: Cache turborepo for iOS
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turborepo-ios-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
-          restore-keys: |
-            ${{ runner.os }}-turborepo-ios-
+                  npx --yes create-expo-app@latest "$EXPO_WORK_DIR/app" --template blank-typescript --yes --no-install
 
-      - name: Check turborepo cache for iOS
-        run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:ios').cache.status")
+                  cd "$EXPO_WORK_DIR/app"
+                  npm install
+                  npm install "$GITHUB_WORKSPACE/$PACKAGE_TGZ"
 
-          if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
-            echo "turbo_cache_hit=1" >> $GITHUB_ENV
-          fi
+                  node <<'NODE'
+                  const fs = require('node:fs');
+                  const path = 'app.json';
+                  const app = JSON.parse(fs.readFileSync(path, 'utf8'));
+                  app.expo = app.expo || {};
+                  app.expo.plugins = [
+                    ['@preeternal/react-native-file-hash', { engine: process.env.ZFH_ENGINE }],
+                  ];
+                  fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
+                  NODE
 
-      - name: Use appropriate Xcode version
-        if: env.turbo_cache_hit != 1
-        uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
-        with:
-          xcode-version: ${{ env.XCODE_VERSION }}
+                  npx expo prebuild --platform all --clean --non-interactive --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
 
-      - name: Install cocoapods
-        if: env.turbo_cache_hit != 1 && steps.cocoapods-cache.outputs.cache-hit != 'true'
-        run: |
-          cd example
-          bundle install
-          bundle exec pod repo update --verbose
-          bundle exec pod install --project-directory=ios
+                  grep -q "^react_native_file_hash_engine=${ZFH_ENGINE}$" android/gradle.properties
+                  grep -q "ENV\\['ZFH_ENGINE'\\] ||= '${ZFH_ENGINE}'" ios/Podfile
 
-      - name: Build example for iOS
-        run: |
-          yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+            - name: Print Expo prebuild diagnostics (${{ matrix.engine }})
+              if: always()
+              run: |
+                  set -euo pipefail
+
+                  echo "::group::app.json"
+                  cat "$EXPO_WORK_DIR/app/app.json"
+                  echo "::endgroup::"
+
+                  echo "::group::android/gradle.properties"
+                  cat "$EXPO_WORK_DIR/app/android/gradle.properties"
+                  echo "::endgroup::"
+
+                  echo "::group::ios/Podfile engine lines"
+                  grep -n "ZFH_ENGINE" "$EXPO_WORK_DIR/app/ios/Podfile" || true
+                  echo "::endgroup::"
+
+            - name: Upload Expo prebuild diagnostics (${{ matrix.engine }})
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: expo-prebuild-${{ matrix.engine }}-diagnostics
+                  if-no-files-found: warn
+                  path: |
+                      ${{ env.EXPO_WORK_DIR }}/prebuild.log
+                      ${{ env.EXPO_WORK_DIR }}/app/app.json
+                      ${{ env.EXPO_WORK_DIR }}/app/android/gradle.properties
+                      ${{ env.EXPO_WORK_DIR }}/app/ios/Podfile
+
+            - name: Cleanup Expo prebuild workspace (${{ matrix.engine }})
+              if: always()
+              run: rm -rf "$EXPO_WORK_DIR"
+
+    build-android:
+        runs-on: ubuntu-latest
+
+        env:
+            TURBO_CACHE_DIR: .turbo/android
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Cache turborepo for Android
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: ${{ env.TURBO_CACHE_DIR }}
+                  key: ${{ runner.os }}-turborepo-android-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
+                  restore-keys: |
+                      ${{ runner.os }}-turborepo-android-
+
+            - name: Check turborepo cache for Android
+              run: |
+                  TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
+
+                  if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
+                    echo "turbo_cache_hit=1" >> $GITHUB_ENV
+                  fi
+
+            - name: Install JDK
+              if: env.turbo_cache_hit != 1
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+              with:
+                  distribution: 'zulu'
+                  java-version: '17'
+
+            - name: Finalize Android SDK
+              if: env.turbo_cache_hit != 1
+              run: |
+                  /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
+
+            - name: Cache Gradle
+              if: env.turbo_cache_hit != 1
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: |
+                      ~/.gradle/wrapper
+                      ~/.gradle/caches
+                  key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
+                  restore-keys: |
+                      ${{ runner.os }}-gradle-
+
+            - name: Build example for Android
+              env:
+                  JAVA_OPTS: '-XX:MaxHeapSize=6g'
+              run: |
+                  yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+
+            - name: Verify 16KB page alignment
+              run: bash scripts/check-16kb.sh
+
+    test-android-native-jvm:
+        runs-on: ubuntu-latest
+
+        env:
+            ORG_GRADLE_PROJECT_react_native_file_hash_engine: native
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Install JDK
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+              with:
+                  distribution: 'zulu'
+                  java-version: '17'
+
+            - name: Finalize Android SDK
+              run: |
+                  /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
+
+            - name: Cache Gradle
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: |
+                      ~/.gradle/wrapper
+                      ~/.gradle/caches
+                  key: ${{ runner.os }}-gradle-jvm-tests-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
+                  restore-keys: |
+                      ${{ runner.os }}-gradle-jvm-tests-
+                      ${{ runner.os }}-gradle-
+
+            - name: Run Android JVM unit tests (native engine)
+              run: |
+                  cd example/android
+                  ./gradlew :preeternal_react-native-file-hash:testDebugUnitTest --no-daemon --console=plain -Preact_native_file_hash_engine=native
+
+    build-android-zig:
+        runs-on: ubuntu-latest
+
+        env:
+            TURBO_CACHE_DIR: .turbo/android-zig
+            ORG_GRADLE_PROJECT_react_native_file_hash_engine: zig
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Cache turborepo for Android (zig)
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: ${{ env.TURBO_CACHE_DIR }}
+                  key: ${{ runner.os }}-turborepo-android-zig-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
+                  restore-keys: |
+                      ${{ runner.os }}-turborepo-android-zig-
+
+            - name: Check turborepo cache for Android (zig)
+              run: |
+                  TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
+
+                  if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
+                    echo "turbo_cache_hit=1" >> $GITHUB_ENV
+                  fi
+
+            - name: Install JDK
+              if: env.turbo_cache_hit != 1
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+              with:
+                  distribution: 'zulu'
+                  java-version: '17'
+
+            - name: Install Zig
+              if: env.turbo_cache_hit != 1
+              uses: ./.github/actions/setup-zig
+
+            - name: Finalize Android SDK
+              if: env.turbo_cache_hit != 1
+              run: |
+                  /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
+
+            - name: Cache Gradle
+              if: env.turbo_cache_hit != 1
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: |
+                      ~/.gradle/wrapper
+                      ~/.gradle/caches
+                  key: ${{ runner.os }}-gradle-zig-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
+                  restore-keys: |
+                      ${{ runner.os }}-gradle-zig-
+                      ${{ runner.os }}-gradle-
+
+            - name: Build Zig prebuilts for Android
+              if: env.turbo_cache_hit != 1
+              run: ./scripts/build-zig-android.sh
+
+            - name: Build example for Android (zig)
+              env:
+                  JAVA_OPTS: '-XX:MaxHeapSize=6g'
+              run: |
+                  yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+
+            - name: Verify 16KB page alignment (zig)
+              run: bash scripts/check-16kb.sh
+
+    maestro-android-smoke:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                engine: [native, zig]
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Install JDK
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+              with:
+                  distribution: 'zulu'
+                  java-version: '17'
+
+            - name: Install Zig
+              if: matrix.engine == 'zig'
+              uses: ./.github/actions/setup-zig
+
+            - name: Build Zig prebuilts for Android
+              if: matrix.engine == 'zig'
+              run: ./scripts/build-zig-android.sh
+
+            - name: Install Maestro CLI
+              run: |
+                  set -euo pipefail
+                  curl -Ls "https://get.maestro.mobile.dev" | bash
+                  echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+            - name: Run Maestro runtime smoke (${{ matrix.engine }})
+              uses: reactivecircus/android-emulator-runner@v2
+              with:
+                  api-level: 34
+                  arch: x86_64
+                  profile: pixel_6
+                  disable-animations: true
+                  script: |
+                      set -euo pipefail
+                      cd example/android
+                      ./gradlew :app:assembleRelease :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=x86_64 -Preact_native_file_hash_engine=${{ matrix.engine }}
+                      cd ../..
+                      bash scripts/maestro-runtime-smoke.sh ${{ matrix.engine }}
+
+            - name: Upload Maestro artifacts (${{ matrix.engine }})
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: maestro-android-${{ matrix.engine }}-artifacts
+                  if-no-files-found: warn
+                  path: ~/.maestro/tests
+
+    maestro-ios-smoke:
+        runs-on: macos-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                engine: [native, zig]
+        env:
+            XCODE_VERSION: latest-stable
+            RCT_USE_RN_DEP: 1
+            RCT_USE_PREBUILT_RNCORE: 1
+            ZFH_ENGINE: ${{ matrix.engine }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Use appropriate Xcode version
+              uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+              with:
+                  xcode-version: ${{ env.XCODE_VERSION }}
+
+            - name: Install Zig
+              if: matrix.engine == 'zig'
+              uses: ./.github/actions/setup-zig
+
+            - name: Build Zig prebuilts for iOS
+              if: matrix.engine == 'zig'
+              run: ./scripts/build-zig-ios.sh
+
+            - name: Install CocoaPods dependencies
+              run: |
+                  set -euo pipefail
+                  cd example
+                  bundle install
+                  bundle exec pod install --project-directory=ios --repo-update
+
+            - name: Install Maestro CLI
+              run: |
+                  set -euo pipefail
+                  curl -Ls "https://get.maestro.mobile.dev" | bash
+                  echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+            - name: Build and install iOS app (${{ matrix.engine }})
+              run: |
+                  set -euo pipefail
+
+                  SIMULATOR_ID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')
+                  if [[ -z "${SIMULATOR_ID}" ]]; then
+                    echo "No available iPhone simulator found" >&2
+                    exit 1
+                  fi
+
+                  xcrun simctl boot "$SIMULATOR_ID" || true
+                  xcrun simctl bootstatus "$SIMULATOR_ID" -b
+
+                  DERIVED_DATA="$RUNNER_TEMP/maestro-ios-${{ matrix.engine }}"
+                  rm -rf "$DERIVED_DATA"
+
+                  xcodebuild \
+                    -workspace example/ios/FileHashExample.xcworkspace \
+                    -scheme FileHashExample \
+                    -configuration Release \
+                    -sdk iphonesimulator \
+                    -destination "id=$SIMULATOR_ID" \
+                    -derivedDataPath "$DERIVED_DATA" \
+                    CODE_SIGNING_ALLOWED=NO \
+                    build
+
+                  APP_PATH=$(find "$DERIVED_DATA/Build/Products/Release-iphonesimulator" -maxdepth 1 -name "*.app" | head -n1)
+                  if [[ -z "${APP_PATH}" ]]; then
+                    echo "Built .app not found in $DERIVED_DATA" >&2
+                    exit 1
+                  fi
+
+                  APP_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist")
+                  if [[ -z "${APP_ID}" ]]; then
+                    echo "Unable to resolve CFBundleIdentifier" >&2
+                    exit 1
+                  fi
+
+                  xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
+                  echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+                  echo "APP_ID=$APP_ID" >> "$GITHUB_ENV"
+
+            - name: Run Maestro runtime smoke on iOS (${{ matrix.engine }})
+              run: |
+                  set -euo pipefail
+                  APP_ID="$APP_ID" maestro test ".maestro/runtime-${{ matrix.engine }}-smoke-ios.yaml"
+
+            - name: Upload Maestro artifacts iOS (${{ matrix.engine }})
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: maestro-ios-${{ matrix.engine }}-artifacts
+                  if-no-files-found: warn
+                  path: ~/.maestro/tests
+
+    build-ios:
+        runs-on: macos-latest
+
+        env:
+            XCODE_VERSION: latest-stable
+            TURBO_CACHE_DIR: .turbo/ios
+            RCT_USE_RN_DEP: 1
+            RCT_USE_PREBUILT_RNCORE: 1
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Cache turborepo for iOS
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: ${{ env.TURBO_CACHE_DIR }}
+                  key: ${{ runner.os }}-turborepo-ios-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
+                  restore-keys: |
+                      ${{ runner.os }}-turborepo-ios-
+
+            - name: Check turborepo cache for iOS
+              run: |
+                  TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:ios').cache.status")
+
+                  if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
+                    echo "turbo_cache_hit=1" >> $GITHUB_ENV
+                  fi
+
+            - name: Use appropriate Xcode version
+              if: env.turbo_cache_hit != 1
+              uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+              with:
+                  xcode-version: ${{ env.XCODE_VERSION }}
+
+            - name: Install cocoapods
+              if: env.turbo_cache_hit != 1 && steps.cocoapods-cache.outputs.cache-hit != 'true'
+              run: |
+                  cd example
+                  bundle install
+                  bundle exec pod repo update --verbose
+                  bundle exec pod install --project-directory=ios
+
+            - name: Build example for iOS
+              run: |
+                  yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+
+    build-ios-zig:
+        runs-on: macos-latest
+
+        env:
+            XCODE_VERSION: latest-stable
+            TURBO_CACHE_DIR: .turbo/ios-zig
+            RCT_USE_RN_DEP: 1
+            RCT_USE_PREBUILT_RNCORE: 1
+            ZFH_ENGINE: zig
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Cache turborepo for iOS (zig)
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                  path: ${{ env.TURBO_CACHE_DIR }}
+                  key: ${{ runner.os }}-turborepo-ios-zig-${{ hashFiles('yarn.lock', 'turbo.json', '.gitmodules') }}
+                  restore-keys: |
+                      ${{ runner.os }}-turborepo-ios-zig-
+
+            - name: Check turborepo cache for iOS (zig)
+              run: |
+                  TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:ios').cache.status")
+
+                  if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
+                    echo "turbo_cache_hit=1" >> $GITHUB_ENV
+                  fi
+
+            - name: Use appropriate Xcode version
+              if: env.turbo_cache_hit != 1
+              uses: maxim-lobanov/setup-xcode@60606e260d2fc5762a71e64e74b2174e8ea3c8bd # v1.6.0
+              with:
+                  xcode-version: ${{ env.XCODE_VERSION }}
+
+            - name: Install Zig
+              if: env.turbo_cache_hit != 1
+              uses: ./.github/actions/setup-zig
+
+            - name: Build Zig prebuilts for iOS
+              if: env.turbo_cache_hit != 1
+              run: ./scripts/build-zig-ios.sh
+
+            - name: Install cocoapods
+              if: env.turbo_cache_hit != 1 && steps.cocoapods-cache.outputs.cache-hit != 'true'
+              run: |
+                  cd example
+                  bundle install
+                  bundle exec pod repo update --verbose
+                  bundle exec pod install --project-directory=ios
+
+            - name: Build example for iOS (zig)
+              run: |
+                  yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}"

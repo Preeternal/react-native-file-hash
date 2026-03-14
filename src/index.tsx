@@ -1,118 +1,144 @@
-import { Buffer } from 'buffer';
 import FileHash, {
     type THashAlgorithm,
     type HashOptions,
     type THashEncoding,
-    type THashMode,
     type TKeyEncoding,
+    type RuntimeInfo,
+    type RuntimeDiagnostics as NativeRuntimeDiagnostics,
 } from './NativeFileHash';
 
-type HmacCapable = Extract<
+type HmacAlgorithm = Extract<
     THashAlgorithm,
-    'SHA-224' | 'SHA-256' | 'SHA-384' | 'SHA-512'
+    | 'HMAC-SHA-224'
+    | 'HMAC-SHA-256'
+    | 'HMAC-SHA-384'
+    | 'HMAC-SHA-512'
+    | 'HMAC-MD5'
+    | 'HMAC-SHA-1'
 >;
 
-// TODO: replace this check into native-side validation
-const decodeKey = (
-    key: string,
-    encoding: TKeyEncoding = 'utf8'
-): Uint8Array => {
-    if (!key) {
-        throw new Error('Key is required for keyed/hmac modes');
-    }
-    switch (encoding) {
-        case 'utf8': {
-            const bufUtf8 = Buffer.from(key, 'utf8');
-            return new Uint8Array(
-                bufUtf8.buffer,
-                bufUtf8.byteOffset,
-                bufUtf8.length
-            );
-        }
-        case 'hex': {
-            const cleaned = key.replace(/\s+/g, '');
-            if (cleaned.length % 2 !== 0) {
-                throw new Error('Hex key length must be even');
-            }
-            const bytes = new Uint8Array(cleaned.length / 2);
-            for (let i = 0; i < cleaned.length; i += 2) {
-                bytes[i / 2] = parseInt(cleaned.slice(i, i + 2), 16);
-            }
-            return bytes;
-        }
-        case 'base64': {
-            const buf = Buffer.from(key, 'base64');
-            return new Uint8Array(buf.buffer, buf.byteOffset, buf.length);
-        }
-        default:
-            throw new Error(`Unsupported keyEncoding: ${encoding}`);
+type NativeHashOptions = {
+    key?: string;
+    keyEncoding?: TKeyEncoding;
+};
+
+type InvalidArgumentError = Error & { code: 'E_INVALID_ARGUMENT' };
+
+type LegacyHashOptions = HashOptions & {
+    mode?: unknown;
+};
+
+type ZigRuntimeDiagnostics = {
+    engine: 'zig';
+    zigApiVersion: number;
+    zigExpectedApiVersion: number;
+    zigApiCompatible: boolean;
+    zigVersion: string;
+};
+
+type RuntimeDiagnostics = { engine: 'native' } | ZigRuntimeDiagnostics;
+
+const HMAC_ALGORITHMS: ReadonlyArray<HmacAlgorithm> = [
+    'HMAC-SHA-224',
+    'HMAC-SHA-256',
+    'HMAC-SHA-384',
+    'HMAC-SHA-512',
+    'HMAC-MD5',
+    'HMAC-SHA-1',
+] as const;
+
+const isHmacAlgorithm = (
+    algorithm: THashAlgorithm
+): algorithm is HmacAlgorithm =>
+    (HMAC_ALGORITHMS as readonly THashAlgorithm[]).includes(algorithm);
+
+let didWarnHashStringDeprecation = false;
+
+const createInvalidArgumentError = (message: string): InvalidArgumentError => {
+    const error = new Error(message) as InvalidArgumentError;
+    error.code = 'E_INVALID_ARGUMENT';
+    return error;
+};
+
+const warnHashStringDeprecationOnce = (): void => {
+    if (didWarnHashStringDeprecation) return;
+
+    const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
+    if (!isDev) return;
+
+    didWarnHashStringDeprecation = true;
+    if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+        console.warn(
+            '`hashString` is deprecated and will be removed in a future release. Use `stringHash`.'
+        );
     }
 };
 
 const validateAndNormalizeOptions = (
     algorithm: THashAlgorithm,
     options?: HashOptions
-): HashOptions & {
-    mode: THashMode;
-    key?: string;
-    keyEncoding?: TKeyEncoding;
-} => {
-    const mode: THashMode = options?.mode ?? 'hash';
-
-    if (mode === 'hash') {
-        return { mode };
+): NativeHashOptions => {
+    const legacyMode = (options as LegacyHashOptions | undefined)?.mode;
+    if (legacyMode !== undefined) {
+        throw createInvalidArgumentError(
+            '`mode` option was removed. Use HMAC-* algorithms or BLAKE3 with `key`.'
+        );
     }
 
     const keyEncoding: TKeyEncoding = options?.keyEncoding ?? 'utf8';
-    const keyString = options?.key;
+    const key = options?.key;
+    const hasKey = key !== undefined;
 
-    if (!keyString) {
-        throw new Error('Key is required when using hmac/keyed mode');
-    }
-
-    if (mode === 'hmac') {
-        if (
-            !(
-                ['SHA-224', 'SHA-256', 'SHA-384', 'SHA-512'] as HmacCapable[]
-            ).includes(algorithm as HmacCapable)
-        ) {
-            throw new Error(
-                `HMAC is only supported for SHA-224, SHA-256, SHA-384, SHA-512 (got ${algorithm})`
+    if (isHmacAlgorithm(algorithm)) {
+        if (!hasKey) {
+            throw createInvalidArgumentError(
+                `Key is required for ${algorithm}`
             );
         }
-        return { mode, key: keyString, keyEncoding };
+        return { key, keyEncoding };
     }
 
-    if (mode === 'keyed') {
-        if (algorithm !== 'BLAKE3') {
-            throw new Error(
-                `Keyed mode is only supported for BLAKE3 (got ${algorithm})`
-            );
+    if (algorithm === 'BLAKE3') {
+        if (hasKey) {
+            return { key, keyEncoding };
         }
-        const decoded = decodeKey(keyString, keyEncoding);
-        if (decoded.length !== 32) {
-            throw new Error('BLAKE3 keyed mode requires a 32-byte key');
-        }
-        return { mode, key: keyString, keyEncoding };
+        return {};
     }
 
-    throw new Error(`Unsupported mode: ${mode}`);
+    if (hasKey) {
+        throw createInvalidArgumentError(
+            'Key is only used for HMAC algorithms or BLAKE3'
+        );
+    }
+
+    return {};
+};
+
+const normalizeRuntimeDiagnostics = (
+    diagnostics: NativeRuntimeDiagnostics
+): RuntimeDiagnostics => {
+    if (diagnostics.engine === 'zig') {
+        return diagnostics;
+    }
+
+    return { engine: 'native' };
 };
 
 /**
  * Calculates the hash of a file.
  * @param filePath The path to the file.
  * @param algorithm The hash algorithm to use.
- * @param options Hash options: mode ('hash' | 'hmac' | 'keyed'), key, keyEncoding ('utf8' | 'hex' | 'base64').
- * @returns A promise that resolves with the hex-encoded hash string.
+ * @param options Hash options: key, keyEncoding ('utf8' | 'hex' | 'base64').
+ * Output format is fixed: lowercase hex string.
+ * @returns A promise that resolves with a lowercase hex digest string.
  */
-export function fileHash(
+export async function fileHash(
     filePath: string,
     algorithm: THashAlgorithm = 'SHA-256',
     options?: HashOptions
 ): Promise<string> {
     const normalized = validateAndNormalizeOptions(algorithm, options);
-    return FileHash?.fileHash(filePath, algorithm, normalized);
+    return FileHash.fileHash(filePath, algorithm, normalized);
 }
 
 /**
@@ -120,8 +146,22 @@ export function fileHash(
  * @param text The input string or base64-encoded data.
  * @param algorithm The hash algorithm to use.
  * @param encoding Input encoding: 'utf8' (default) or 'base64'.
- * @param options Hash options: mode ('hash' | 'hmac' | 'keyed'), key, keyEncoding ('utf8' | 'hex' | 'base64').
- * @returns A promise that resolves with the hex-encoded hash string.
+ * @param options Hash options: key, keyEncoding ('utf8' | 'hex' | 'base64').
+ * Output format is fixed: lowercase hex string.
+ * @returns A promise that resolves with a lowercase hex digest string.
+ */
+export async function stringHash(
+    text: string,
+    algorithm: THashAlgorithm = 'SHA-256',
+    encoding: THashEncoding = 'utf8',
+    options?: HashOptions
+): Promise<string> {
+    const normalized = validateAndNormalizeOptions(algorithm, options);
+    return FileHash.stringHash(text, algorithm, encoding, normalized);
+}
+
+/**
+ * @deprecated Use `stringHash` instead.
  */
 export function hashString(
     text: string,
@@ -129,14 +169,30 @@ export function hashString(
     encoding: THashEncoding = 'utf8',
     options?: HashOptions
 ): Promise<string> {
-    const normalized = validateAndNormalizeOptions(algorithm, options);
-    return FileHash?.hashString(text, algorithm, encoding, normalized);
+    warnHashStringDeprecationOnce();
+    return stringHash(text, algorithm, encoding, options);
+}
+
+/**
+ * Returns the currently selected runtime engine.
+ */
+export function getRuntimeInfo(): Promise<RuntimeInfo> {
+    return FileHash.getRuntimeInfo();
+}
+
+/**
+ * Returns detailed runtime diagnostics (engine + Zig ABI/core metadata).
+ */
+export function getRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
+    return FileHash.getRuntimeDiagnostics().then(normalizeRuntimeDiagnostics);
 }
 
 export type {
     THashAlgorithm,
     THashEncoding,
-    THashMode,
     TKeyEncoding,
     HashOptions,
+    InvalidArgumentError,
+    RuntimeInfo,
+    RuntimeDiagnostics,
 };

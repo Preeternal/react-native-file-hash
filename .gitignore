@@ -55,6 +55,8 @@ node_modules/
 npm-debug.log
 yarn-debug.log
 yarn-error.log
+coverage/
+.nyc_output/
 
 # BUCK
 buck-out/
@@ -94,3 +96,6 @@ example/ios/FileHashExample.xcworkspace/xcshareddata/WorkspaceSettings.xcsetting
 
 # Local notes
 submodule-notes.md
+
+# Zig prebuilt artifacts
+third_party/zig-files-hash-prebuilt/
