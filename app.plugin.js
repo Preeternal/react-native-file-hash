@@ -8,8 +8,16 @@ try {
     }
     configPlugins = require('expo/config-plugins');
 }
-const { createRunOncePlugin, withAndroidGradleProperties, withPodfile } =
-    configPlugins;
+const { createRunOncePlugin, withPodfile } = configPlugins;
+const withAndroidGradleProperties =
+    configPlugins.withAndroidGradleProperties ??
+    configPlugins.withGradleProperties;
+
+if (typeof withAndroidGradleProperties !== 'function') {
+    throw new Error(
+        `${pkg.name}: incompatible expo config-plugins API (missing Gradle properties helper).`
+    );
+}
 
 const PLUGIN_NAME = pkg.name;
 const VALID_ENGINES = new Set(['native', 'zig']);
