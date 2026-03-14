@@ -35,7 +35,7 @@ runs:
             ;;
         esac
 
-        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_TARGET}-${ZIG_VERSION}.tar.xz"
+        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_VERSION}-${ZIG_TARGET}.tar.xz"
         curl -L "$ZIG_URL" -o "$RUNNER_TEMP/zig.tar.xz"
         mkdir -p "$RUNNER_TEMP/zig"
         tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1

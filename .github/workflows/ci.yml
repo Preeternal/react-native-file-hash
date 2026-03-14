@@ -94,7 +94,7 @@ jobs:
 
                   cd "$EXPO_WORK_DIR/app"
                   npm install
-                  npm install "$GITHUB_WORKSPACE/$PACKAGE_TGZ"
+                  npm install --ignore-scripts "$GITHUB_WORKSPACE/$PACKAGE_TGZ"
 
                   node <<'NODE'
                   const fs = require('node:fs');
@@ -118,15 +118,27 @@ jobs:
                   set -euo pipefail
 
                   echo "::group::app.json"
-                  cat "$EXPO_WORK_DIR/app/app.json"
+                  if [[ -f "$EXPO_WORK_DIR/app/app.json" ]]; then
+                    cat "$EXPO_WORK_DIR/app/app.json"
+                  else
+                    echo "Missing: $EXPO_WORK_DIR/app/app.json"
+                  fi
                   echo "::endgroup::"
 
                   echo "::group::android/gradle.properties"
-                  cat "$EXPO_WORK_DIR/app/android/gradle.properties"
+                  if [[ -f "$EXPO_WORK_DIR/app/android/gradle.properties" ]]; then
+                    cat "$EXPO_WORK_DIR/app/android/gradle.properties"
+                  else
+                    echo "Missing: $EXPO_WORK_DIR/app/android/gradle.properties"
+                  fi
                   echo "::endgroup::"
 
                   echo "::group::ios/Podfile engine lines"
-                  grep -n "ZFH_ENGINE" "$EXPO_WORK_DIR/app/ios/Podfile" || true
+                  if [[ -f "$EXPO_WORK_DIR/app/ios/Podfile" ]]; then
+                    grep -n "ZFH_ENGINE" "$EXPO_WORK_DIR/app/ios/Podfile" || true
+                  else
+                    echo "Missing: $EXPO_WORK_DIR/app/ios/Podfile"
+                  fi
                   echo "::endgroup::"
 
             - name: Upload Expo prebuild diagnostics (${{ matrix.engine }})
@@ -358,11 +370,12 @@ jobs:
                   profile: pixel_6
                   disable-animations: true
                   script: |
-                      set -euo pipefail
+                      bash -euo pipefail <<'BASH'
                       cd example/android
                       ./gradlew :app:assembleRelease :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=x86_64 -Preact_native_file_hash_engine=${{ matrix.engine }}
                       cd ../..
                       bash scripts/maestro-runtime-smoke.sh ${{ matrix.engine }}
+                      BASH
 
             - name: Upload Maestro artifacts (${{ matrix.engine }})
               if: always()

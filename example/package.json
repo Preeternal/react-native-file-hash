@@ -7,7 +7,7 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "build:android": "react-native build-android --mode release --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
-    "build:ios": "react-native build-ios --mode Release"
+    "build:ios": "react-native build-ios --mode Release --destination 'generic/platform=iOS Simulator' --extra-params 'CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO'"
   },
   "dependencies": {
     "@react-native-documents/picker": "^11.0.3",
