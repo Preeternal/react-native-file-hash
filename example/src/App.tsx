@@ -156,6 +156,7 @@ function AppContent() {
         !runtimeDiagnostics.zigApiCompatible
             ? ' (mismatch)'
             : '';
+    const runtimeEngine = runtimeInfo?.engine ?? runtimeDiagnostics?.engine;
     const zigApiLabel =
         runtimeDiagnostics?.engine === 'zig'
             ? `${runtimeDiagnostics.zigApiVersion}/${runtimeDiagnostics.zigExpectedApiVersion}${zigCompatibilitySuffix}`
@@ -166,7 +167,7 @@ function AppContent() {
             ? runtimeDiagnostics.zigVersion
             : 'n/a';
     const showZigRuntimeDetails =
-        runtimeDiagnostics?.engine === 'zig' || runtimeInfo?.engine === 'zig';
+        runtimeDiagnostics?.engine === 'zig' || runtimeEngine === 'zig';
 
     const buildKeyOptions = () => {
         if (!isHmacAlgorithm && key.length === 0) {
@@ -314,7 +315,7 @@ function AppContent() {
                     testID="runtime-engine"
                     style={[styles.runtimeBadgeLine, { color: palette.text }]}
                 >
-                    engine: {runtimeInfo?.engine ?? '...'}
+                    engine: {runtimeEngine ?? '...'}
                 </Text>
                 {showZigRuntimeDetails ? (
                     <>
