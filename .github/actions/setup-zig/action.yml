@@ -19,7 +19,7 @@ runs:
 
         case "${{ runner.os }}" in
           Linux)
-            ZIG_TARGET="linux-x86_64"
+            ZIG_TARGET="x86_64-linux"
             ;;
           macOS)
             ARCH="$(uname -m)"
@@ -35,8 +35,9 @@ runs:
             ;;
         esac
 
-        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_VERSION}-${ZIG_TARGET}.tar.xz"
-        curl -L "$ZIG_URL" -o "$RUNNER_TEMP/zig.tar.xz"
+        ZIG_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_TARGET}-${ZIG_VERSION}.tar.xz"
+        echo "Downloading Zig from: $ZIG_URL"
+        curl -fL --retry 3 "$ZIG_URL" -o "$RUNNER_TEMP/zig.tar.xz"
         mkdir -p "$RUNNER_TEMP/zig"
         tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
         echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
