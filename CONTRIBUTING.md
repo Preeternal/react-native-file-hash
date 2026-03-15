@@ -61,8 +61,10 @@ Replace `"<IOS_DEVICE_NAME>"` with your actual iPhone device name.
 ./scripts/build-zig-ios.sh && (cd example && ZFH_ENGINE=zig bundle exec pod install --project-directory=ios && ZFH_ENGINE=zig npx react-native run-ios --mode Release --device "<IOS_DEVICE_NAME>")
 ```
 
+### Local development and rebuilds
+
 If you need a full clean rebuild, run `./gradlew clean` (Android) or clean the
-Xcode build folder before repeating the commands above.
+Xcode build folder before repeating the commands in the sections below.
 
 The [example app](/example/) demonstrates usage of the library. You need to run it to test any changes you make.
 
@@ -124,6 +126,77 @@ Remember to add tests for your change if possible. Run the unit tests by:
 yarn test
 ```
 
+### Local Maestro smoke runs (Android/iOS, native/zig)
+
+Use these commands to run the same Maestro smoke checks locally that CI uses.
+
+Notes:
+
+- If `maestro` is not installed yet, install it once: `curl -Ls "https://get.maestro.mobile.dev" | bash`
+  Then make sure `$HOME/.maestro/bin` is in your `PATH` for the current shell.
+- For Android, set `-PreactNativeArchitectures` to match your local emulator ABI.
+  Apple Silicon emulators are usually `arm64-v8a`; GitHub Actions Linux uses `x86_64`.
+- The Android commands below auto-pick the first connected device from `adb devices`.
+  If you have more than one device/emulator attached, set `ANDROID_SERIAL` manually before running them.
+- For iOS, always pass `--device "$SIMULATOR_ID"` to Maestro. If Android and iOS devices are both running, Maestro can otherwise pick the wrong device.
+
+```sh
+# 1) Android / native / local emulator
+ANDROID_SERIAL="${ANDROID_SERIAL:-$(adb devices | awk '$2 == "device" { print $1; exit }')}"
+[[ -n "$ANDROID_SERIAL" ]] || { echo "No Android device/emulator found" >&2; exit 1; }
+adb -s "$ANDROID_SERIAL" uninstall preeternal.reactnativefilehash.example || true
+./example/android/gradlew -p example/android :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a -Preact_native_file_hash_engine=native
+ANDROID_SERIAL="$ANDROID_SERIAL" MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 bash ./scripts/maestro-runtime-smoke.sh native
+
+# 2) Android / zig / local emulator
+ANDROID_SERIAL="${ANDROID_SERIAL:-$(adb devices | awk '$2 == "device" { print $1; exit }')}"
+[[ -n "$ANDROID_SERIAL" ]] || { echo "No Android device/emulator found" >&2; exit 1; }
+adb -s "$ANDROID_SERIAL" uninstall preeternal.reactnativefilehash.example || true
+./scripts/build-zig-android.sh
+./example/android/gradlew -p example/android :app:installRelease --no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a -Preact_native_file_hash_engine=zig
+ANDROID_SERIAL="$ANDROID_SERIAL" MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 bash ./scripts/maestro-runtime-smoke.sh zig
+
+# 3) iOS / native / local simulator
+SIMULATOR_ID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')
+DERIVED_DATA="$TMPDIR/maestro-ios-native"
+rm -rf "$DERIVED_DATA"
+xcrun simctl boot "$SIMULATOR_ID" || true
+xcrun simctl bootstatus "$SIMULATOR_ID" -b
+(cd example && env -u ZFH_ENGINE bundle exec pod install --project-directory=ios)
+xcodebuild -workspace example/ios/FileHashExample.xcworkspace -scheme FileHashExample -configuration Release -sdk iphonesimulator -destination "id=$SIMULATOR_ID" -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO build
+APP_PATH=$(find "$DERIVED_DATA/Build/Products/Release-iphonesimulator" -maxdepth 1 -name "*.app" | head -n1)
+APP_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist")
+xcrun simctl uninstall "$SIMULATOR_ID" "$APP_ID" || true
+xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
+MAESTRO_CLI_NO_ANALYTICS=1 maestro --device "$SIMULATOR_ID" test -e APP_ID="$APP_ID" .maestro/runtime-native-smoke-ios.yaml
+
+# 4) iOS / zig / local simulator
+SIMULATOR_ID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ {print $2; exit}')
+DERIVED_DATA="$TMPDIR/maestro-ios-zig"
+rm -rf "$DERIVED_DATA"
+xcrun simctl boot "$SIMULATOR_ID" || true
+xcrun simctl bootstatus "$SIMULATOR_ID" -b
+./scripts/build-zig-ios.sh
+(cd example && ZFH_ENGINE=zig bundle exec pod install --project-directory=ios)
+xcodebuild -workspace example/ios/FileHashExample.xcworkspace -scheme FileHashExample -configuration Release -sdk iphonesimulator -destination "id=$SIMULATOR_ID" -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO build
+APP_PATH=$(find "$DERIVED_DATA/Build/Products/Release-iphonesimulator" -maxdepth 1 -name "*.app" | head -n1)
+APP_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist")
+xcrun simctl uninstall "$SIMULATOR_ID" "$APP_ID" || true
+xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
+MAESTRO_CLI_NO_ANALYTICS=1 maestro --device "$SIMULATOR_ID" test -e APP_ID="$APP_ID" .maestro/runtime-zig-smoke-ios.yaml
+```
+
+### Release checklist
+
+Before publishing a release, run all four local Maestro smoke commands from the section above:
+
+- Android / native
+- Android / zig
+- iOS / native
+- iOS / zig
+
+Maestro smoke is intentionally not part of GitHub Actions CI for this repository.
+Hosted emulator/simulator runs were too slow and too flaky, so these checks are kept local before release.
 
 ### Commit message convention
 
