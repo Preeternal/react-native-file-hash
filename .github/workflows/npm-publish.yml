@@ -6,7 +6,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: read
       id-token: write
@@ -26,11 +26,14 @@ jobs:
           cache: 'yarn'
       - run: corepack enable
 
+      - name: Init submodules
+        run: git submodule update --init --recursive
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+
       - name: Install deps (Yarn 4 workspaces)
         run: yarn install --immutable
-
-      - name: Build (bob via prepare)
-        run: yarn prepare
 
       - name: Ensure version not already on npm
         run: |
@@ -40,6 +43,18 @@ jobs:
             echo "::error::${NAME}@${VER} already exists on npm"
             exit 1
           fi
+
+      - name: Build Zig prebuilts for Android
+        run: ./scripts/build-zig-android.sh
+
+      - name: Build Zig prebuilts for iOS
+        run: ./scripts/build-zig-ios.sh
+
+      - name: Build package (bob via prepare)
+        run: yarn prepare
+
+      - name: Verify packaged artifacts
+        run: yarn check:packaged-artifacts
 
       - name: Publish to npm
         env:

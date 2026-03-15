@@ -47,7 +47,8 @@
     "compare:size:ios": "bash scripts/compare-size-ios.sh",
     "test": "jest",
     "test:e2e:maestro:native": "bash scripts/maestro-runtime-smoke.sh native",
-    "test:e2e:maestro:zig": "bash scripts/maestro-runtime-smoke.sh zig"
+    "test:e2e:maestro:zig": "bash scripts/maestro-runtime-smoke.sh zig",
+    "check:packaged-artifacts": "bash scripts/check-packed-prebuilts.sh"
   },
   "keywords": [
     "react-native",

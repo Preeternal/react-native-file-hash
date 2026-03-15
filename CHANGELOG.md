@@ -76,11 +76,11 @@ Notes
 
 ## v1.1.1 – bundle native sources (XXH3/BLAKE3, HMAC/keyed)
 
-## Fix
+### Fix
 
 - Bundled native sources (xxhash/blake3) in the npm package so iOS builds no longer fail with `xxhash.h file not found` and the TurboModule registers correctly.
 
-## Reminder (from 1.1.0)
+### Reminder (from 1.1.0)
 
 - Native **XXH3-64/XXH3-128** and **BLAKE3** on iOS/Android.
 - `hashString(text, algorithm, encoding?, options?)` for small payloads (utf8/base64); for real files use `fileHash` (streams from disk).
@@ -89,7 +89,7 @@ Notes
 - Example app: hash file/string, switch modes, test utf8/hex/base64 keys. Migrated to `create-react-native-library` template (TurboModule, new/old arch).
 - README: algorithm table, output lengths, thread-safety note, submodule reminder.
 
-## Notes
+### Notes
 
 - After clone: `git submodule update --init --recursive`.
 - Tests: `yarn test`.

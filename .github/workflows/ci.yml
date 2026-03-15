@@ -152,6 +152,31 @@ jobs:
               if: always()
               run: rm -rf "$EXPO_WORK_DIR"
 
+    verify-packaged-artifacts:
+        runs-on: macos-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Install Zig
+              uses: ./.github/actions/setup-zig
+
+            - name: Build Zig prebuilts for Android
+              run: ./scripts/build-zig-android.sh
+
+            - name: Build Zig prebuilts for iOS
+              run: ./scripts/build-zig-ios.sh
+
+            - name: Build package
+              run: yarn prepare
+
+            - name: Verify packaged artifacts
+              run: yarn check:packaged-artifacts
+
     build-android:
         runs-on: ubuntu-latest
 

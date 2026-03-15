@@ -186,10 +186,16 @@ xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
 MAESTRO_CLI_NO_ANALYTICS=1 maestro --device "$SIMULATOR_ID" test -e APP_ID="$APP_ID" .maestro/runtime-zig-smoke-ios.yaml
 ```
 
+### Package validation
+
+Before publishing a release, run `yarn check:packaged-artifacts` from the repository root.
+This verifies that the npm tarball contains all required packaged third-party artifacts for both `native` and `zig` builds.
+
 ### Release checklist
 
-Before publishing a release, run all four local Maestro smoke commands from the section above:
+Before publishing a release, run the packaging check and all four local Maestro smoke commands:
 
+- `yarn check:packaged-artifacts`
 - Android / native
 - Android / zig
 - iOS / native
@@ -197,6 +203,7 @@ Before publishing a release, run all four local Maestro smoke commands from the 
 
 Maestro smoke is intentionally not part of GitHub Actions CI for this repository.
 Hosted emulator/simulator runs were too slow and too flaky, so these checks are kept local before release.
+The packaged-artifacts check does run in CI, because it is deterministic and must fail before any broken npm publish.
 
 ### Commit message convention
 
