@@ -1,6 +1,6 @@
 # Releases
 
-## v2.0.0 - Switchable engines (`native` / `zig`) and API update
+## v2.0.1 - Switchable engines (`native` / `zig`) and API update
 
 ### Breaking changes
 
