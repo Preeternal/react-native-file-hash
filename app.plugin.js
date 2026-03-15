@@ -3,15 +3,17 @@ let configPlugins;
 try {
     configPlugins = require('@expo/config-plugins');
 } catch (error) {
-    if (error?.code !== 'MODULE_NOT_FOUND') {
+    const errorCode = error && error.code;
+    if (errorCode !== 'MODULE_NOT_FOUND') {
         throw error;
     }
     configPlugins = require('expo/config-plugins');
 }
 const { createRunOncePlugin, withPodfile } = configPlugins;
 const withAndroidGradleProperties =
-    configPlugins.withAndroidGradleProperties ??
-    configPlugins.withGradleProperties;
+    typeof configPlugins.withAndroidGradleProperties === 'function'
+        ? configPlugins.withAndroidGradleProperties
+        : configPlugins.withGradleProperties;
 
 if (typeof withAndroidGradleProperties !== 'function') {
     throw new Error(
@@ -25,7 +27,9 @@ const PODFILE_BLOCK_START = '# @preeternal/react-native-file-hash begin';
 const PODFILE_BLOCK_END = '# @preeternal/react-native-file-hash end';
 
 function normalizeEngine(rawEngine) {
-    const engine = (rawEngine ?? 'native').toString().toLowerCase();
+    const normalized =
+        rawEngine == null ? '' : String(rawEngine).trim().toLowerCase();
+    const engine = normalized === '' ? 'native' : normalized;
     if (!VALID_ENGINES.has(engine)) {
         throw new Error(
             `${PLUGIN_NAME}: invalid engine '${rawEngine}'. Expected 'native' or 'zig'.`

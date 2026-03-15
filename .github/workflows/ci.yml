@@ -102,6 +102,9 @@ jobs:
                   fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
                   NODE
 
+                  CI=1 npx expo config --json > "$EXPO_WORK_DIR/expo-config.json"
+                  node -e "JSON.parse(require(\"node:fs\").readFileSync(process.argv[1], \"utf8\"))" "$EXPO_WORK_DIR/expo-config.json"
+
                   CI=1 npx expo prebuild --platform all --clean --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
 
                   grep -q "^react_native_file_hash_engine=${ZFH_ENGINE}$" android/gradle.properties
@@ -117,6 +120,14 @@ jobs:
                     cat "$EXPO_WORK_DIR/app/app.json"
                   else
                     echo "Missing: $EXPO_WORK_DIR/app/app.json"
+                  fi
+                  echo "::endgroup::"
+
+                  echo "::group::expo config"
+                  if [[ -f "$EXPO_WORK_DIR/expo-config.json" ]]; then
+                    cat "$EXPO_WORK_DIR/expo-config.json"
+                  else
+                    echo "Missing: $EXPO_WORK_DIR/expo-config.json"
                   fi
                   echo "::endgroup::"
 
@@ -145,6 +156,7 @@ jobs:
                   path: |
                       ${{ env.EXPO_WORK_DIR }}/prebuild.log
                       ${{ env.EXPO_WORK_DIR }}/app/app.json
+                      ${{ env.EXPO_WORK_DIR }}/expo-config.json
                       ${{ env.EXPO_WORK_DIR }}/app/android/gradle.properties
                       ${{ env.EXPO_WORK_DIR }}/app/ios/Podfile
 
