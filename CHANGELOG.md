@@ -1,5 +1,14 @@
 # Releases
 
+## v2.0.2 - Packaging cleanup
+
+### Fixed
+
+- Removed unnecessary runtime dependency on `buffer`.
+- Package no longer pulls `buffer` into consumer installs; no API/runtime behavior changes.
+
+---
+
 ## v2.0.1 - Switchable engines (`native` / `zig`) and API update
 
 ### Breaking changes
