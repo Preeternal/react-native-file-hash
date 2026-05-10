@@ -17,6 +17,12 @@ runs:
 
               ZIG_VERSION="${{ inputs.version }}"
 
+              if [[ "${{ runner.os }}" == "macOS" && "$ZIG_VERSION" == "0.15.2" ]]; then
+                brew install zig@0.15
+                echo "$(brew --prefix zig@0.15)/bin" >> "$GITHUB_PATH"
+                exit 0
+              fi
+
               case "${{ runner.os }}" in
                 Linux)
                   ARCHIVE_CANDIDATES=(

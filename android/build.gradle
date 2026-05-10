@@ -1,6 +1,18 @@
 buildscript {
-  ext.getExtOrDefault = {name ->
-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['FileHash_' + name]
+  ext.FileHash = [
+    kotlinVersion: "2.0.21",
+    minSdkVersion: 24,
+    compileSdkVersion: 36,
+    targetSdkVersion: 36,
+    ndkVersion: "27.1.12297006"
+  ]
+
+  ext.getExtOrDefault = { prop ->
+    if (rootProject.ext.has(prop)) {
+      return rootProject.ext.get(prop)
+    }
+
+    return FileHash[prop]
   }
 
   repositories {
@@ -20,10 +32,6 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
 apply plugin: "com.facebook.react"
-
-def getExtOrIntegerDefault(name) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["FileHash_" + name]).toInteger()
-}
 
 def fileHashEngine =
   (project.findProperty("react_native_file_hash_engine")
@@ -48,11 +56,12 @@ if (!(fileHashEngine in ["native", "zig"])) {
 android {
   namespace "com.preeternal.filehash"
 
-  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+  ndkVersion getExtOrDefault("ndkVersion")
+  compileSdkVersion getExtOrDefault("compileSdkVersion")
 
   defaultConfig {
-    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
-    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    minSdkVersion getExtOrDefault("minSdkVersion")
+    targetSdkVersion getExtOrDefault("targetSdkVersion")
     buildConfigField "String", "FILE_HASH_ENGINE", "\"${fileHashEngine}\""
     buildConfigField "String", "FILE_HASH_ZIG_CORE_VERSION", "\"${zigCoreVersion}\""
 
@@ -79,7 +88,7 @@ android {
     }
   }
 
-  lintOptions {
+  lint {
     disable "GradleCompatible"
   }
 
@@ -98,15 +107,7 @@ android {
   }
 }
 
-repositories {
-  mavenCentral()
-  google()
-}
-
-def kotlin_version = getExtOrDefault("kotlinVersion")
-
 dependencies {
   implementation "com.facebook.react:react-android"
-  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   testImplementation "junit:junit:4.13.2"
 }

@@ -9,27 +9,27 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all,
+    baseDirectory: __dirname,
+    recommendedConfig: js.configs.recommended,
+    allConfig: js.configs.all,
 });
 
 export default defineConfig([
-  {
-    extends: fixupConfigRules(compat.extends('@react-native', 'prettier')),
-    plugins: { prettier },
-    rules: {
-      'react/react-in-jsx-scope': 'off',
-      'prettier/prettier': 'error',
+    {
+        extends: fixupConfigRules(compat.extends('@react-native', 'prettier')),
+        plugins: { prettier },
+        rules: {
+            'react/react-in-jsx-scope': 'off',
+            'prettier/prettier': 'error',
+        },
     },
-  },
-  {
-    ignores: [
-      'eslint.config.mjs',
-      'node_modules/',
-      'lib/',
-      'coverage/',
-      '.nyc_output/',
-    ],
-  },
+    {
+        ignores: [
+            'eslint.config.mjs',
+            'node_modules/',
+            'lib/',
+            'coverage/',
+            '.nyc_output/',
+        ],
+    },
 ]);

@@ -364,7 +364,7 @@ jobs:
         runs-on: macos-latest
 
         env:
-            XCODE_VERSION: latest-stable
+            XCODE_VERSION: 26
             TURBO_CACHE_DIR: .turbo/ios
             RCT_USE_RN_DEP: 1
             RCT_USE_PREBUILT_RNCORE: 1
@@ -414,7 +414,7 @@ jobs:
         runs-on: macos-latest
 
         env:
-            XCODE_VERSION: latest-stable
+            XCODE_VERSION: 26
             TURBO_CACHE_DIR: .turbo/ios-zig
             RCT_USE_RN_DEP: 1
             RCT_USE_PREBUILT_RNCORE: 1

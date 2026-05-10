@@ -1,49 +1,54 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [".nvmrc", ".yarnrc.yml"],
-  "globalEnv": ["NODE_ENV"],
-  "tasks": {
-    "build:android": {
-      "env": ["ANDROID_HOME", "ORG_GRADLE_PROJECT_newArchEnabled"],
-      "inputs": [
-        "package.json",
-        "android/**",
-        "!android/.gradle/**",
-        "!android/build/**",
-        "!android/app/build/**",
-        "../package.json",
-        "../.gitmodules",
-        "../third_party/**",
-        "../android/**",
-        "!../android/build/**",
-        "../src/**/*.ts",
-        "../src/**/*.tsx"
-      ],
-      "outputs": [
-        "android/build/**/libfilehash-native.so",
-        "android/app/build/**/libfilehash-native.so"
-      ]
-    },
-    "build:ios": {
-      "env": [
-        "RCT_NEW_ARCH_ENABLED",
-        "RCT_USE_RN_DEP",
-        "RCT_USE_PREBUILT_RNCORE"
-      ],
-      "inputs": [
-        "package.json",
-        "ios/**",
-        "!ios/build/**",
-        "!ios/Pods/**",
-        "../package.json",
-        "../.gitmodules",
-        "../third_party/**",
-        "../*.podspec",
-        "../ios/**",
-        "../src/**/*.ts",
-        "../src/**/*.tsx"
-      ],
-      "outputs": []
+    "$schema": "https://turbo.build/schema.json",
+    "globalDependencies": [".nvmrc", ".yarnrc.yml"],
+    "globalEnv": ["NODE_ENV"],
+    "tasks": {
+        "build:android": {
+            "env": ["ANDROID_HOME", "ORG_GRADLE_PROJECT_newArchEnabled"],
+            "inputs": [
+                "package.json",
+                "android/**",
+                "!android/.gradle/**",
+                "!android/.cxx/**",
+                "!android/build/**",
+                "!android/app/.cxx/**",
+                "!android/app/build/**",
+                "../package.json",
+                "../.gitmodules",
+                "../third_party/**",
+                "../android/**",
+                "!../android/.gradle/**",
+                "!../android/.cxx/**",
+                "!../android/build/**",
+                "../src/**/*.ts",
+                "../src/**/*.tsx"
+            ],
+            "outputs": [
+                "android/build/**/libfilehash-native.so",
+                "android/app/build/**/libfilehash-native.so"
+            ]
+        },
+        "build:ios": {
+            "env": [
+                "RCT_NEW_ARCH_ENABLED",
+                "RCT_REMOVE_LEGACY_ARCH",
+                "RCT_USE_RN_DEP",
+                "RCT_USE_PREBUILT_RNCORE"
+            ],
+            "inputs": [
+                "package.json",
+                "ios/**",
+                "!ios/build/**",
+                "!ios/Pods/**",
+                "../package.json",
+                "../.gitmodules",
+                "../third_party/**",
+                "../*.podspec",
+                "../ios/**",
+                "../src/**/*.ts",
+                "../src/**/*.tsx"
+            ],
+            "outputs": []
+        }
     }
-  }
 }

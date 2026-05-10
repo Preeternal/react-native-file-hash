@@ -246,9 +246,9 @@ function AppContent() {
         setElapsedMs(null);
         try {
             const options = buildKeyOptions();
-            const start = performance.now();
+            const start = Date.now();
             const value = await fileHash(pickedFile.uri, selectedAlgo, options);
-            const end = performance.now();
+            const end = Date.now();
             setHash(value);
             setElapsedMs(end - start);
         } catch (error: any) {
@@ -268,14 +268,14 @@ function AppContent() {
         setTextElapsedMs(null);
         try {
             const options = buildKeyOptions();
-            const start = performance.now();
+            const start = Date.now();
             const value = await stringHash(
                 textInput,
                 selectedAlgo,
                 textEncoding,
                 options
             );
-            const end = performance.now();
+            const end = Date.now();
             setTextHash(value);
             setTextElapsedMs(end - start);
         } catch (error: any) {

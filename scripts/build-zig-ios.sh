@@ -26,6 +26,31 @@ if ! command -v lipo >/dev/null 2>&1; then
   exit 1
 fi
 
+# Xcode 26 rejects Zig-produced archives whose Mach-O members are not 8-byte aligned.
+repack_static_library() {
+  local input_lib="$1"
+  local output_lib="$2"
+  local work_dir
+  work_dir="$(mktemp -d)"
+
+  (
+    cd "${work_dir}"
+    xcrun ar -x "${input_lib}"
+
+    local objects=(*.o)
+    if [[ ! -e "${objects[0]}" ]]; then
+      echo "No object files found in ${input_lib}" >&2
+      exit 1
+    fi
+
+    chmod u+rw "${objects[@]}"
+    xcrun libtool -static -o "${output_lib}" "${objects[@]}"
+    xcrun ranlib "${output_lib}"
+  )
+
+  rm -rf "${work_dir}"
+}
+
 if [[ ! -f "${ZIG_CORE_DIR}/build.zig" ]]; then
   echo "zig-files-hash submodule is missing: ${ZIG_CORE_DIR}"
   echo "Run: git submodule update --init --recursive"
@@ -46,7 +71,7 @@ build_target() {
       --prefix "${prefix_dir}"
   )
 
-  cp "${prefix_dir}/lib/libzig_files_hash_c_api_static.a" "${out_lib}"
+  repack_static_library "${prefix_dir}/lib/libzig_files_hash_c_api_static.a" "${out_lib}"
   rm -rf "${prefix_dir}"
 }
 

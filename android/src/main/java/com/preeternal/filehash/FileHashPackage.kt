@@ -5,7 +5,6 @@ import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
-import java.util.HashMap
 
 class FileHashPackage : BaseReactPackage() {
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
@@ -16,18 +15,16 @@ class FileHashPackage : BaseReactPackage() {
         }
     }
 
-    override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
-        return ReactModuleInfoProvider {
-            val moduleInfos: MutableMap<String, ReactModuleInfo> = HashMap()
-            moduleInfos[FileHashModule.NAME] = ReactModuleInfo(
-                FileHashModule.NAME,
-                FileHashModule.NAME,
-                canOverrideExistingModule = false,  // canOverrideExistingModule
-                needsEagerInit = false,  // needsEagerInit
-                isCxxModule = false,  // isCxxModule
-                isTurboModule = true // isTurboModule
+    override fun getReactModuleInfoProvider() = ReactModuleInfoProvider {
+        mapOf(
+            FileHashModule.NAME to ReactModuleInfo(
+                name = FileHashModule.NAME,
+                className = FileHashModule.NAME,
+                canOverrideExistingModule = false,
+                needsEagerInit = false,
+                isCxxModule = false,
+                isTurboModule = true
             )
-            moduleInfos
-        }
+        )
     }
 }

@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import FileHash, { type THashAlgorithm } from '../NativeFileHash';
 import {
     fileHash,
@@ -35,13 +36,17 @@ const ZIG_STRING_VECTORS: Record<string, string> = {
 const DEFAULT_HMAC_KEY = 'my_secret_key';
 const DEFAULT_BLAKE3_KEY =
     '3031323334353637383961626364656630313233343536373839616263646566';
+const mockedFileHash = jest.mocked(FileHash.fileHash);
+const mockedStringHash = jest.mocked(FileHash.stringHash);
+const mockedGetRuntimeInfo = jest.mocked(FileHash.getRuntimeInfo);
+const mockedGetRuntimeDiagnostics = jest.mocked(FileHash.getRuntimeDiagnostics);
 
 const vectorForRequest = (
     algorithm: string,
     options?: Record<string, unknown>
 ) => {
     if (algorithm === 'BLAKE3' && options?.key !== undefined) {
-        return ZIG_STRING_VECTORS['BLAKE3-KEYED'];
+        return ZIG_STRING_VECTORS['BLAKE3-KEYED']!;
     }
     const vector = ZIG_STRING_VECTORS[algorithm];
     if (!vector) {
@@ -119,7 +124,9 @@ describe('fileHash options validation', () => {
 });
 
 describe('stringHash mirrors validation', () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it('uses defaults when options omitted', async () => {
         await stringHash('abc');
@@ -173,7 +180,9 @@ describe('stringHash mirrors validation', () => {
 });
 
 describe('hashString deprecated alias', () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it('warns once in dev mode', async () => {
         const warnSpy = jest
@@ -204,10 +213,12 @@ describe('hashString deprecated alias', () => {
 });
 
 describe('zig API compatibility errors', () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it('passes through native compatibility error for fileHash', async () => {
-        (FileHash.fileHash as jest.Mock).mockRejectedValueOnce(
+        mockedFileHash.mockRejectedValueOnce(
             Object.assign(
                 new Error(
                     'Incompatible Zig C API version: runtime=2 expected=1'
@@ -225,7 +236,7 @@ describe('zig API compatibility errors', () => {
     });
 
     it('passes through native compatibility error for stringHash', async () => {
-        (FileHash.stringHash as jest.Mock).mockRejectedValueOnce(
+        mockedStringHash.mockRejectedValueOnce(
             Object.assign(
                 new Error(
                     'Incompatible Zig C API version: runtime=3 expected=1'
@@ -248,11 +259,11 @@ describe('zig API compatibility errors', () => {
 describe('zig vectors parity on JS boundary', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        (FileHash.stringHash as jest.Mock).mockImplementation(
+        mockedStringHash.mockImplementation(
             async (
                 _text: string,
                 algorithm: string,
-                _encoding: string,
+                _encoding?: string,
                 options?: Record<string, unknown>
             ) => vectorForRequest(algorithm, options)
         );
@@ -319,15 +330,15 @@ describe('zig vectors parity on JS boundary', () => {
 });
 
 describe('runtime info', () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
     it('returns runtime engine from native module', async () => {
         await expect(getRuntimeInfo()).resolves.toEqual({
             engine: 'zig',
         });
-        expect((FileHash.getRuntimeInfo as jest.Mock).mock.calls).toHaveLength(
-            1
-        );
+        expect(mockedGetRuntimeInfo.mock.calls).toHaveLength(1);
     });
 
     it('returns runtime diagnostics from native module', async () => {
@@ -338,13 +349,11 @@ describe('runtime info', () => {
             zigApiCompatible: true,
             zigVersion: 'v0.0.3',
         });
-        expect(
-            (FileHash.getRuntimeDiagnostics as jest.Mock).mock.calls
-        ).toHaveLength(1);
+        expect(mockedGetRuntimeDiagnostics.mock.calls).toHaveLength(1);
     });
 
     it('normalizes native runtime diagnostics to the public native shape', async () => {
-        (FileHash.getRuntimeDiagnostics as jest.Mock).mockResolvedValueOnce({
+        mockedGetRuntimeDiagnostics.mockResolvedValueOnce({
             engine: 'native',
             zigApiVersion: 0,
             zigExpectedApiVersion: 0,
@@ -364,16 +373,12 @@ describe('runtime info', () => {
         await expect(getRuntimeInfo()).resolves.toEqual({
             engine: 'zig',
         });
-        expect((FileHash.getRuntimeInfo as jest.Mock).mock.calls).toHaveLength(
-            2
-        );
-        expect(
-            (FileHash.getRuntimeDiagnostics as jest.Mock).mock.calls
-        ).toHaveLength(1);
+        expect(mockedGetRuntimeInfo.mock.calls).toHaveLength(2);
+        expect(mockedGetRuntimeDiagnostics.mock.calls).toHaveLength(1);
     });
 
     it('forwards diagnostics errors', async () => {
-        (FileHash.getRuntimeDiagnostics as jest.Mock).mockRejectedValueOnce(
+        mockedGetRuntimeDiagnostics.mockRejectedValueOnce(
             new Error('Diagnostics unavailable')
         );
         await expect(getRuntimeDiagnostics()).rejects.toThrow(

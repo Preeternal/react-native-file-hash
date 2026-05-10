@@ -1,3 +1,5 @@
+import { jest } from '@jest/globals';
+
 jest.mock('./NativeFileHash', () => ({
     __esModule: true,
     default: {
