@@ -156,10 +156,10 @@ const keyed = await fileHash(fileUri, {
 Hashes a file by streaming it from native code.
 
 ```ts
-const digest = await fileHash(fileUri, {
-  algorithm: 'SHA-256',
+const mac = await fileHash(fileUri, {
+  algorithm: 'HMAC-SHA-256',
   hashOptions: {
-    key: 'optional-key',
+    key: 'upload-signing-secret',
     keyEncoding: 'utf8',
   },
   signal: abortController.signal,
@@ -173,7 +173,8 @@ const digest = await fileHash(fileUri, {
 - an iOS provider-backed file URL, for example from Files or iCloud, when the
   app has access.
 
-If `request.algorithm` is omitted, `SHA-256` is used.
+If `request.algorithm` is omitted, `SHA-256` is used. Use `hashOptions.key`
+only with HMAC algorithms or keyed `BLAKE3`; regular hashes reject keys.
 
 ### `stringHash(text, request?)`
 
