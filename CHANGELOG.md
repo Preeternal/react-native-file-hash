@@ -1,5 +1,157 @@
 # Releases
 
+## v2.0.4 - Zig C ABI v3, streaming files, and cancellation
+
+This release updates the Zig core to `zig-files-hash` `v0.0.5`, moves file
+hashing fully onto streaming paths, and adds AbortController-style cancellation
+for both the `native` and `zig` engines.
+
+Existing positional JavaScript calls still work, but the new object-style
+request API is now the recommended API shape because it can carry
+`algorithm`, `hashOptions`, and `signal` without placeholder arguments.
+
+### Why cancellation matters
+
+Hashing a large video, archive, or offline map can take long enough for the
+user to change their mind. With `AbortController`, apps can stop native hashing
+when the user leaves the screen, picks another file, closes a modal, retries an
+upload, or cancels a verification step.
+
+That means less wasted CPU and battery, fewer stale promises updating old UI
+state, and a cleaner integration with the same cancellation pattern developers
+already use for `fetch`.
+
+### Added
+
+- Added object-style request overloads for both public hash functions:
+  - `fileHash(filePath, { algorithm, hashOptions, signal })`
+  - `stringHash(text, { algorithm, encoding, hashOptions, signal })`
+- Added `HashRequest`, `StringHashRequest`, `HashAbortSignal`, and
+  `HashAbortError` TypeScript types.
+- Added optional `AbortSignal` support for cancelling work the app no longer
+  needs. Aborting rejects with `E_CANCELLED` and normalizes the JS error name
+  to `AbortError`.
+- Added native `cancelOperation(operationId)` plumbing behind the JS API.
+  Operation ids are internal; users should cancel with `AbortController`.
+- Added cancellation coverage for file hashing and string hashing in both
+  engines:
+  - Android native engine checks cancellation between stream chunks and closes
+    the active `InputStream` on cancel.
+  - Android Zig engine forwards cancellation into the Zig operation state.
+  - iOS native engine tracks `Operation` instances and rejects cancelled work
+    with `E_CANCELLED`.
+  - iOS Zig engine tracks operations and forwards cancellation into the Zig
+    operation state.
+- Added benchmark controls to the example app, including generated local test
+  files, warmups, samples, per-algorithm results, and cancellation.
+
+### Changed
+
+- File hashing now uses streaming implementations throughout the runtime.
+  The Zig file path no longer depends on the old one-shot file API:
+  - Android Zig reads React Native file/content URIs through an `InputStream`
+    and feeds `zfh_hasher_*`.
+  - iOS Zig streams file URLs/paths through `zfh_hasher_*`.
+  - Native engines continue to stream file data from disk.
+- Updated the bundled Zig core to `zig-files-hash` `v0.0.5`.
+- Updated the Zig integration to C ABI v3 (`ZFH_API_VERSION = 3`) and the new
+  request/operation-state API.
+- Updated Zig error mapping for the v3 ABI, including
+  `ZFH_OUTPUT_BUFFER_TOO_SMALL`, `ZFH_OPERATION_CANCELED`, and
+  `ZFH_INVALID_STATE`.
+- `fileHash(path)` and `fileHash(path, {})` both default to `SHA-256`.
+- `stringHash(text)` and `stringHash(text, {})` both default to `SHA-256` with
+  `utf8` input encoding.
+- The example app now uses the fresh object-style API and exposes cancel
+  buttons for file hashing, string hashing, and benchmark runs.
+- `scripts/check-packed-prebuilts.sh` now uses an isolated npm cache while
+  packing and verifies the generated Zig C ABI header in the package.
+
+### Deprecated
+
+- Deprecated positional overloads:
+  - `fileHash(filePath, algorithm, options)`
+  - `stringHash(text, algorithm, encoding, options)`
+- `hashString(...)` remains as a deprecated alias for `stringHash(...)`.
+
+Recommended replacement:
+
+```ts
+const digest = await fileHash(fileUri, {
+  algorithm: 'SHA-256',
+});
+```
+
+Cancelable flow:
+
+```ts
+const controller = new AbortController();
+
+const promise = fileHash(fileUri, {
+  algorithm: 'SHA-256',
+  signal: controller.signal,
+});
+
+controller.abort();
+
+await promise; // rejects with E_CANCELLED / AbortError
+```
+
+For keyed algorithms:
+
+```ts
+await fileHash(fileUri, {
+  algorithm: 'HMAC-SHA-256',
+  hashOptions: {
+    key: 'secret',
+    keyEncoding: 'utf8',
+  },
+});
+```
+
+### Compatibility
+
+- Hash output remains lowercase hex.
+- Key rules are unchanged:
+  - `HMAC-*` algorithms require `hashOptions.key`.
+  - `BLAKE3` uses keyed mode only when `hashOptions.key` is provided.
+  - Other algorithms reject `hashOptions.key`.
+- `HashOptions.mode` remains removed and still rejects with
+  `E_INVALID_ARGUMENT`.
+- `XXH3-128` remains native-only.
+- Consumers using the published package do not need Zig installed. Custom
+  source/prebuilt builds must use the `zig-files-hash` C ABI v3 core.
+- Cancellation is cooperative. Long file hashes stop at chunk boundaries; small
+  `stringHash` calls can finish before an abort is observed.
+
+### Performance
+
+- Refreshed physical-device Release benchmarks for the current `native` and
+  `zig` engines. Full current tables live in `BENCHMARKS.md`.
+- The refreshed benchmark tables compare the current `zig` engine with the
+  current `native` engine. They should be read separately from the
+  release-to-release Zig speedups below.
+- Compared with the previous benchmark set, Zig `BLAKE3` is much faster:
+  - iOS 200 MiB: `728 ms` -> `~302 ms`
+  - Android 200 MiB: `551 ms` -> `~391 ms`
+- Zig `XXH3-64` improved on iOS: `81 ms` -> `~66 ms` for 200 MiB.
+- Zig `SHA-224` / `SHA-256` and matching HMAC variants remain competitive on
+  iOS and stay near native on Android through the existing native fallback.
+- Native remains the faster choice for iOS `SHA-1` and the iOS
+  `SHA-384` / `SHA-512` family.
+- On Android, Zig remains the faster choice for `SHA-512/224` and
+  `SHA-512/256`; native remains faster for `SHA-1`, `SHA-384`, `SHA-512`,
+  `BLAKE3`, and `XXH3-64` in the current device run.
+
+### Testing
+
+- Expanded Jest coverage for the object request API, default values, abort
+  handling, native cancellation calls, and `AbortError` normalization.
+- Updated runtime diagnostics tests for Zig C ABI v3 and `zig-files-hash`
+  `v0.0.5`.
+
+---
+
 ## v2.0.3 - iOS Zig engine fix and React Native 0.85 template refresh
 
 This release fixes iOS Zig engine prebuilts for Xcode 26 and refreshes the

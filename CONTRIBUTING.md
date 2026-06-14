@@ -42,6 +42,10 @@ Prebuilt output locations:
 - `third_party/zig-files-hash-prebuilt/android/<ABI>/libzig_files_hash.a`
 - `third_party/zig-files-hash-prebuilt/ios/ZigFilesHash.xcframework`
 
+The bundled Zig core is `zig-files-hash v0.0.5` with C ABI v3
+(`ZFH_API_VERSION = 3`). Custom source/prebuilt builds must use a compatible
+Zig C ABI.
+
 ### Release builds on physical devices (native vs zig)
 
 Use these commands for manual smoke/performance verification in Release mode.
