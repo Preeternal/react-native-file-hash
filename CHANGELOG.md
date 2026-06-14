@@ -1,6 +1,6 @@
 # Releases
 
-## v2.0.4 - Zig C ABI v3, streaming files, and cancellation
+## v2.0.5 - Zig C ABI v3, streaming files, and cancellation
 
 This release updates the Zig core to `zig-files-hash` `v0.0.5`, moves file
 hashing fully onto streaming paths, and adds AbortController-style cancellation
