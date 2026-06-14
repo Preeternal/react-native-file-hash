@@ -38,15 +38,23 @@ internal object Sha512t {
         return digest.finalResult()
     }
 
-    fun digestStream(stream: InputStream, bufferSize: Int, variant: Variant): ByteArray {
+    fun digestStream(
+        stream: InputStream,
+        bufferSize: Int,
+        variant: Variant,
+        operation: HashOperation? = null
+    ): ByteArray {
         val digest = Digest(variant)
         val buffer = ByteArray(bufferSize)
         var read: Int
+        operation?.throwIfCancelled()
         while (stream.read(buffer).also { read = it } != -1) {
+            operation?.throwIfCancelled()
             if (read > 0) {
                 digest.update(buffer, 0, read)
             }
         }
+        operation?.throwIfCancelled()
         return digest.finalResult()
     }
 

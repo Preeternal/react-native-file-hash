@@ -5,7 +5,7 @@ inputs:
     version:
         description: Zig version to install
         required: false
-        default: '0.15.2'
+        default: '0.16.0'
 
 runs:
     using: composite
@@ -71,3 +71,7 @@ runs:
               mkdir -p "$RUNNER_TEMP/zig"
               tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
               echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
+
+        - name: Verify Zig
+          shell: bash
+          run: zig version

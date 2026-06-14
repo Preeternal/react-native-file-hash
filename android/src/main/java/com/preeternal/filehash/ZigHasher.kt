@@ -14,18 +14,14 @@ internal object ZigHasher {
     external fun stringHash(
         algorithm: String,
         data: ByteArray,
-        key: ByteArray?
-    ): ByteArray?
-
-    external fun fileHash(
-        algorithm: String,
-        path: String,
-        key: ByteArray?
+        key: ByteArray?,
+        operationId: String?
     ): ByteArray?
 
     external fun streamHasherCreate(
         algorithm: String,
-        key: ByteArray?
+        key: ByteArray?,
+        operationId: String?
     ): Long
 
     external fun streamHasherUpdate(
@@ -37,4 +33,6 @@ internal object ZigHasher {
     external fun streamHasherFinal(handle: Long): ByteArray?
 
     external fun streamHasherFree(handle: Long)
+
+    external fun cancelOperation(operationId: String)
 }

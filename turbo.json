@@ -4,7 +4,15 @@
     "globalEnv": ["NODE_ENV"],
     "tasks": {
         "build:android": {
-            "env": ["ANDROID_HOME", "ORG_GRADLE_PROJECT_newArchEnabled"],
+            "env": [
+                "ANDROID_HOME",
+                "ANDROID_SDK_ROOT",
+                "GRADLE_USER_HOME",
+                "JAVA_OPTS",
+                "ORG_GRADLE_PROJECT_newArchEnabled",
+                "ORG_GRADLE_PROJECT_react_native_file_hash_engine",
+                "react_native_file_hash_engine"
+            ],
             "inputs": [
                 "package.json",
                 "android/**",
@@ -33,7 +41,8 @@
                 "RCT_NEW_ARCH_ENABLED",
                 "RCT_REMOVE_LEGACY_ARCH",
                 "RCT_USE_RN_DEP",
-                "RCT_USE_PREBUILT_RNCORE"
+                "RCT_USE_PREBUILT_RNCORE",
+                "ZFH_ENGINE"
             ],
             "inputs": [
                 "package.json",

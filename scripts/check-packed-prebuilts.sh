@@ -20,7 +20,12 @@ fi
 if [[ $# -eq 1 ]]; then
   TARBALL="$1"
 else
-  TARBALL_NAME="$(cd "${ROOT_DIR}" && npm pack --silent --ignore-scripts --pack-destination "${TMP_DIR}" | tail -n1)"
+  (
+    cd "${ROOT_DIR}"
+    npm_config_cache="${TMP_DIR}/npm-cache" \
+      npm pack --silent --ignore-scripts --pack-destination "${TMP_DIR}" >/dev/null
+  )
+  TARBALL_NAME="$(find "${TMP_DIR}" -maxdepth 1 -name '*.tgz' -type f -exec basename {} \; | tail -n1)"
   TARBALL="${TMP_DIR}/${TARBALL_NAME}"
 fi
 
@@ -42,6 +47,7 @@ package/third_party/blake3/c/blake3_portable.c
 package/third_party/blake3/c/blake3_neon.c
 package/third_party/zig-files-hash/build.zig.zon
 package/third_party/zig-files-hash/src/zig_files_hash_c_api.h
+package/third_party/zig-files-hash/src/zig_files_hash_c_api_generated.h
 package/third_party/zig-files-hash-prebuilt/android/arm64-v8a/libzig_files_hash.a
 package/third_party/zig-files-hash-prebuilt/android/armeabi-v7a/libzig_files_hash.a
 package/third_party/zig-files-hash-prebuilt/android/x86/libzig_files_hash.a

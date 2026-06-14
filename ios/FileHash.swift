@@ -13,6 +13,9 @@ public class FileHashImpl: NSObject {
         q.qualityOfService = .utility
         return q
     }()
+    private let operationsLock = NSLock()
+    private var operationsById: [String: Operation] = [:]
+    private var cancelledOperationIds = Set<String>()
 
     private let BLAKE3_OUT_LEN = 32
     private let chunkSize = 64 * 1024
@@ -36,6 +39,56 @@ public class FileHashImpl: NSObject {
         0x2b0199fc2c85b8aa,
         0x0eb72ddc81c52ca2,
     ]
+
+    private enum HashCancelled: Error {
+        case cancelled
+    }
+
+    private func throwIfCancelled(_ operation: Operation?) throws {
+        if operation?.isCancelled == true {
+            throw HashCancelled.cancelled
+        }
+        if let operationId = operation?.name {
+            operationsLock.lock()
+            let isCancelled = cancelledOperationIds.contains(operationId)
+            operationsLock.unlock()
+            if isCancelled {
+                throw HashCancelled.cancelled
+            }
+        }
+    }
+
+    private func enqueueOperation(
+        operationId: String?,
+        work: @escaping (Operation) -> Void
+    ) {
+        let operation = BlockOperation()
+        weak var weakOperation = operation
+        operation.addExecutionBlock {
+            guard let activeOperation = weakOperation else { return }
+            work(activeOperation)
+        }
+
+        let trackedId = operationId?.isEmpty == false ? operationId : nil
+        operation.name = trackedId
+        if let trackedId {
+            operationsLock.lock()
+            operationsById[trackedId] = operation
+            operationsLock.unlock()
+        }
+
+        operation.completionBlock = { [weak self, weak operation] in
+            guard let self, let operation, let trackedId else { return }
+            self.operationsLock.lock()
+            if self.operationsById[trackedId] === operation {
+                self.operationsById.removeValue(forKey: trackedId)
+            }
+            self.cancelledOperationIds.remove(trackedId)
+            self.operationsLock.unlock()
+        }
+
+        queue.addOperation(operation)
+    }
 
     // Implements SHA-512/t by seeding SHA-512 with the custom IV defined for
     // SHA-512/224 and SHA-512/256. This relies on the public CC_SHA512_CTX
@@ -253,9 +306,17 @@ public class FileHashImpl: NSObject {
         }
     }
 
-    private func processFile<H: HashFunction>(with hasher: H, from fileHandle: FileHandle) -> String {
+    private func processFile<H: HashFunction>(
+        with hasher: H,
+        from fileHandle: FileHandle,
+        operation: Operation?
+    ) throws -> String {
         var localHasher = hasher
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 localHasher.update(data: data)
@@ -263,17 +324,27 @@ public class FileHashImpl: NSObject {
             }
             return false
         }) {}
+        try throwIfCancelled(operation)
         let digest = localHasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    private func processFileHMAC(fileHandle: FileHandle, algorithm: String, key: Data) -> String {
+    private func processFileHMAC(
+        fileHandle: FileHandle,
+        algorithm: String,
+        key: Data,
+        operation: Operation?
+    ) throws -> String {
         guard let params = hmacParams(for: algorithm) else { return "" }
         var ctx = CCHmacContext()
         key.withUnsafeBytes { keyBuf in
             CCHmacInit(&ctx, params.algo, keyBuf.baseAddress, key.count)
         }
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -283,16 +354,24 @@ public class FileHashImpl: NSObject {
             }
             return false
         }) {}
+        try throwIfCancelled(operation)
         var out = [UInt8](repeating: 0, count: params.length)
         CCHmacFinal(&ctx, &out)
         return out.map { String(format: "%02x", $0) }.joined()
     }
 
     // SHA-224 via CommonCrypto (CryptoKit does not provide SHA-224)
-    private func processFileSHA224(from fileHandle: FileHandle) -> String {
+    private func processFileSHA224(
+        from fileHandle: FileHandle,
+        operation: Operation?
+    ) throws -> String {
         var ctx = CC_SHA256_CTX()
         CC_SHA224_Init(&ctx)
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -302,6 +381,7 @@ public class FileHashImpl: NSObject {
             }
             return false
         }) {}
+        try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA224_DIGEST_LENGTH))
         CC_SHA224_Final(&digest, &ctx)
         return digest.map { String(format: "%02x", $0) }.joined()
@@ -310,12 +390,17 @@ public class FileHashImpl: NSObject {
     private func processFileSHA512Truncated(
         from fileHandle: FileHandle,
         initialHash: [CC_LONG64],
-        outputLength: Int
-    ) -> String {
+        outputLength: Int,
+        operation: Operation?
+    ) throws -> String {
         var ctx = CC_SHA512_CTX()
         initializeSHA512Context(&ctx, initialHash: initialHash)
 
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -328,16 +413,24 @@ public class FileHashImpl: NSObject {
             return false
         }) {}
 
+        try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA512_DIGEST_LENGTH))
         CC_SHA512_Final(&digest, &ctx)
         return digest[0..<outputLength].map { String(format: "%02x", $0) }.joined()
     }
 
-    private func processFileXXH3_64(from fileHandle: FileHandle) -> String {
+    private func processFileXXH3_64(
+        from fileHandle: FileHandle,
+        operation: Operation?
+    ) throws -> String {
         guard let state = fh_xxh3_64_init() else { return "" }
         defer { fh_xxh3_free(state) }
 
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -350,15 +443,23 @@ public class FileHashImpl: NSObject {
             return false
         }) {}
 
+        try throwIfCancelled(operation)
         let result = fh_xxh3_64_digest(state)
         return String(format: "%016llx", result)
     }
 
-    private func processFileXXH3_128(from fileHandle: FileHandle) -> String {
+    private func processFileXXH3_128(
+        from fileHandle: FileHandle,
+        operation: Operation?
+    ) throws -> String {
         guard let state = fh_xxh3_128_init() else { return "" }
         defer { fh_xxh3_free(state) }
 
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -371,6 +472,7 @@ public class FileHashImpl: NSObject {
             return false
         }) {}
 
+        try throwIfCancelled(operation)
         var digest = [UInt64](repeating: 0, count: 2)
         digest.withUnsafeMutableBufferPointer { ptr in
             fh_xxh3_128_digest(state, ptr.baseAddress)
@@ -378,7 +480,11 @@ public class FileHashImpl: NSObject {
         return String(format: "%016llx%016llx", digest[0], digest[1])
     }
 
-    private func processFileBLAKE3(from fileHandle: FileHandle, keyedKey: Data? = nil) -> String {
+    private func processFileBLAKE3(
+        from fileHandle: FileHandle,
+        keyedKey: Data? = nil,
+        operation: Operation?
+    ) throws -> String {
         let state: UnsafeMutableRawPointer?
         if let keyed = keyedKey, keyed.count == 32 {
             state = keyed.withUnsafeBytes { rawBuf -> UnsafeMutableRawPointer? in
@@ -394,7 +500,11 @@ public class FileHashImpl: NSObject {
         guard let state else { return "" }
         defer { fh_blake3_free(state) }
 
+        try throwIfCancelled(operation)
         while autoreleasepool(invoking: {
+            if operation?.isCancelled == true {
+                return false
+            }
             let data = try? fileHandle.read(upToCount: chunkSize)
             if let data = data, !data.isEmpty {
                 data.withUnsafeBytes { rawBuf in
@@ -407,6 +517,7 @@ public class FileHashImpl: NSObject {
             return false
         }) {}
 
+        try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: BLAKE3_OUT_LEN)
         digest.withUnsafeMutableBufferPointer { ptr in
             fh_blake3_digest(state, ptr.baseAddress, BLAKE3_OUT_LEN)
@@ -449,9 +560,15 @@ public class FileHashImpl: NSObject {
     }
 
     @objc
-    public func fileHash(_ filePath: String, algorithm: String, options: NSDictionary?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        queue.addOperation { [weak self] in
+    public func fileHash(_ filePath: String, algorithm: String, options: NSDictionary?, operationId: String?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        enqueueOperation(operationId: operationId) { [weak self] operation in
             guard let self = self else { return }
+            do {
+                try self.throwIfCancelled(operation)
+            } catch {
+                reject("E_CANCELLED", "Hash computation cancelled", nil)
+                return
+            }
             let parsedKey = self.parseKeyOption(options)
             if let keyError = parsedKey.error {
                 reject("E_INVALID_KEY", keyError, nil)
@@ -484,65 +601,83 @@ public class FileHashImpl: NSObject {
                 let hashString: String
                 if self.isHmacAlgorithm(algorithm) {
                     assert(key != nil, "validateKeyUsage should guarantee non-nil key for HMAC")
-                    hashString = self.processFileHMAC(
+                    hashString = try self.processFileHMAC(
                         fileHandle: fileHandle,
                         algorithm: algorithm,
-                        key: key!
+                        key: key!,
+                        operation: operation
                     )
                 } else if algorithm == "BLAKE3", let key {
                     assert(key.count == 32, "validateKeyUsage should guarantee 32-byte key for BLAKE3 keyed mode")
-                    hashString = self.processFileBLAKE3(from: fileHandle, keyedKey: key)
+                    hashString = try self.processFileBLAKE3(
+                        from: fileHandle,
+                        keyedKey: key,
+                        operation: operation
+                    )
                 } else {
                     switch algorithm {
                     case "MD5":
-                        hashString = self.processFile(with: Insecure.MD5(), from: fileHandle)
+                        hashString = try self.processFile(with: Insecure.MD5(), from: fileHandle, operation: operation)
                     case "SHA-1":
-                        hashString = self.processFile(with: Insecure.SHA1(), from: fileHandle)
+                        hashString = try self.processFile(with: Insecure.SHA1(), from: fileHandle, operation: operation)
                     case "SHA-224":
-                        hashString = self.processFileSHA224(from: fileHandle)
+                        hashString = try self.processFileSHA224(from: fileHandle, operation: operation)
                     case "SHA-256":
-                        hashString = self.processFile(with: SHA256(), from: fileHandle)
+                        hashString = try self.processFile(with: SHA256(), from: fileHandle, operation: operation)
                     case "SHA-384":
-                        hashString = self.processFile(with: SHA384(), from: fileHandle)
+                        hashString = try self.processFile(with: SHA384(), from: fileHandle, operation: operation)
                     case "SHA-512":
-                        hashString = self.processFile(with: SHA512(), from: fileHandle)
+                        hashString = try self.processFile(with: SHA512(), from: fileHandle, operation: operation)
                     case "SHA-512/224":
-                        hashString = self.processFileSHA512Truncated(
+                        hashString = try self.processFileSHA512Truncated(
                             from: fileHandle,
                             initialHash: self.sha512_224InitialHash,
-                            outputLength: Int(CC_SHA224_DIGEST_LENGTH)
+                            outputLength: Int(CC_SHA224_DIGEST_LENGTH),
+                            operation: operation
                         )
                     case "SHA-512/256":
-                        hashString = self.processFileSHA512Truncated(
+                        hashString = try self.processFileSHA512Truncated(
                             from: fileHandle,
                             initialHash: self.sha512_256InitialHash,
-                            outputLength: Int(CC_SHA256_DIGEST_LENGTH)
+                            outputLength: Int(CC_SHA256_DIGEST_LENGTH),
+                            operation: operation
                         )
                     case "XXH3-64":
-                        hashString = self.processFileXXH3_64(from: fileHandle)
+                        hashString = try self.processFileXXH3_64(from: fileHandle, operation: operation)
                     case "XXH3-128":
-                        hashString = self.processFileXXH3_128(from: fileHandle)
+                        hashString = try self.processFileXXH3_128(from: fileHandle, operation: operation)
                     case "BLAKE3":
-                        hashString = self.processFileBLAKE3(from: fileHandle)
+                        hashString = try self.processFileBLAKE3(from: fileHandle, operation: operation)
                     default:
                         reject("E_UNSUPPORTED_ALGORITHM", "Unsupported algorithm: \(algorithm)", nil)
                         return
                     }
                 }
 
+                try self.throwIfCancelled(operation)
                 resolve(hashString)
+            } catch HashCancelled.cancelled {
+                reject("E_CANCELLED", "Hash computation cancelled", nil)
             } catch {
-                // OperationQueue has no isCancelled; cancellation can be handled
-                // by using a BlockOperation and checking op.isCancelled in the loop.
-                reject("E_FILE_HASH_FAILED", "Failed to read file or compute hash", error)
+                if operation.isCancelled {
+                    reject("E_CANCELLED", "Hash computation cancelled", nil)
+                } else {
+                    reject("E_FILE_HASH_FAILED", "Failed to read file or compute hash", error)
+                }
             }
         }
     }
 
     @objc
-    public func stringHash(_ text: String, algorithm: String, encoding: String?, options: NSDictionary?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        queue.addOperation { [weak self] in
+    public func stringHash(_ text: String, algorithm: String, encoding: String?, options: NSDictionary?, operationId: String?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        enqueueOperation(operationId: operationId) { [weak self] operation in
             guard let self = self else { return }
+            do {
+                try self.throwIfCancelled(operation)
+            } catch {
+                reject("E_CANCELLED", "Hash computation cancelled", nil)
+                return
+            }
             let parsedKey = self.parseKeyOption(options)
             if let keyError = parsedKey.error {
                 reject("E_INVALID_KEY", keyError, nil)
@@ -583,13 +718,33 @@ public class FileHashImpl: NSObject {
                 return
             }
 
+            do {
+                try self.throwIfCancelled(operation)
+            } catch {
+                reject("E_CANCELLED", "Hash computation cancelled", nil)
+                return
+            }
             resolve(hashString)
         }
+    }
+
+    @objc
+    public func cancelOperation(_ operationId: String) {
+        guard !operationId.isEmpty else { return }
+        operationsLock.lock()
+        cancelledOperationIds.insert(operationId)
+        operationsLock.unlock()
     }
 
     // Cancel tasks when the module is invalidated (if RN triggers)
     @objc
     public func invalidate() {
+        operationsLock.lock()
+        let operations = Array(operationsById.values)
+        operationsById.removeAll()
+        cancelledOperationIds.removeAll()
+        operationsLock.unlock()
+        operations.forEach { $0.cancel() }
         queue.cancelAllOperations()
     }
 }

@@ -7,6 +7,7 @@
 - (void)fileHash:(NSString *)filePath
        algorithm:(NSString *)algorithm
          options:(NSDictionary *)options
+     operationId:(NSString *)operationId
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject;
 
@@ -14,8 +15,11 @@
          algorithm:(NSString *)algorithm
           encoding:(NSString *)encoding
            options:(NSDictionary *)options
+      operationId:(NSString *)operationId
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject;
+
+- (void)cancelOperation:(NSString *)operationId;
 
 - (void)invalidate;
 

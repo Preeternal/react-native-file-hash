@@ -2,8 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <new>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #if defined(__aarch64__)
 #include <asm/hwcap.h>
@@ -19,8 +22,18 @@ namespace {
 struct PreparedRequest {
     zfh_algorithm algorithm = ZFH_ALG_SHA_256;
     zfh_options options{};
-    const zfh_options *options_ptr = nullptr;
+    bool has_options = false;
 };
+
+struct ZigOperationState {
+    std::vector<uint8_t> storage;
+    void *state_ptr = nullptr;
+    size_t state_len = 0;
+};
+
+std::mutex g_operation_mutex;
+std::unordered_map<std::string, ZigOperationState *> g_operations;
+std::unordered_set<std::string> g_cancelled_operation_ids;
 
 bool ParseAlgorithm(const std::string &algorithm_name, zfh_algorithm *out_algorithm) {
     if (algorithm_name == "SHA-224") {
@@ -179,7 +192,7 @@ bool PrepareRequest(
     }
 
     out_request->options = BuildOptions(has_key, key);
-    out_request->options_ptr = has_key ? &out_request->options : nullptr;
+    out_request->has_options = has_key;
     return true;
 }
 
@@ -187,42 +200,157 @@ bool IsPowerOfTwo(size_t value) {
     return value != 0 && ((value & (value - 1)) == 0);
 }
 
-struct ZigStreamState {
-    std::vector<uint8_t> storage;
-    void *state_ptr = nullptr;
-    size_t state_len = 0;
-};
-
-bool InitStreamStateInplace(
-    zfh_algorithm algorithm,
-    const zfh_options *options_ptr,
-    ZigStreamState *state,
-    zfh_error *out_error
+bool InitAlignedStorage(
+    size_t required_size,
+    size_t required_align,
+    std::vector<uint8_t> *storage,
+    void **out_ptr,
+    size_t *out_len
 ) {
-    const size_t required_size = zfh_hasher_state_size();
-    const size_t required_align = zfh_hasher_state_align();
     if (required_size == 0 || required_align == 0 || !IsPowerOfTwo(required_align)) {
-        *out_error = ZFH_UNKNOWN_ERROR;
         return false;
     }
 
     const size_t capacity = required_size + required_align - 1;
-    state->storage.resize(capacity);
+    storage->resize(capacity);
 
-    void *base = state->storage.data();
+    void *base = storage->data();
     const uintptr_t base_addr = reinterpret_cast<uintptr_t>(base);
     const uintptr_t aligned_addr =
         (base_addr + (required_align - 1)) & ~(static_cast<uintptr_t>(required_align - 1));
 
-    state->state_ptr = reinterpret_cast<void *>(aligned_addr);
-    state->state_len = capacity - static_cast<size_t>(aligned_addr - base_addr);
+    *out_ptr = reinterpret_cast<void *>(aligned_addr);
+    *out_len = capacity - static_cast<size_t>(aligned_addr - base_addr);
+    return true;
+}
+
+bool InitOperationState(ZigOperationState *operation, zfh_error *out_error) {
+    if (!InitAlignedStorage(
+            zfh_operation_state_size(),
+            zfh_operation_state_align(),
+            &operation->storage,
+            &operation->state_ptr,
+            &operation->state_len
+        )) {
+        *out_error = ZFH_UNKNOWN_ERROR;
+        return false;
+    }
+
+    *out_error = zfh_operation_init_inplace(operation->state_ptr, operation->state_len);
+    return *out_error == ZFH_OK;
+}
+
+void RegisterOperation(const std::string &operation_id, ZigOperationState *operation) {
+    if (operation_id.empty() || operation == nullptr) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_operation_mutex);
+    g_operations[operation_id] = operation;
+    if (g_cancelled_operation_ids.erase(operation_id) > 0) {
+        (void)zfh_operation_cancel(operation->state_ptr, operation->state_len);
+    }
+}
+
+void UnregisterOperation(const std::string &operation_id, ZigOperationState *operation) {
+    if (operation_id.empty()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_operation_mutex);
+    const auto it = g_operations.find(operation_id);
+    if (it != g_operations.end() && it->second == operation) {
+        g_operations.erase(it);
+    }
+    g_cancelled_operation_ids.erase(operation_id);
+}
+
+void CancelOperationById(const std::string &operation_id) {
+    if (operation_id.empty()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(g_operation_mutex);
+    const auto it = g_operations.find(operation_id);
+    if (it == g_operations.end()) {
+        g_cancelled_operation_ids.insert(operation_id);
+        return;
+    }
+
+    ZigOperationState *operation = it->second;
+    if (operation != nullptr) {
+        (void)zfh_operation_cancel(operation->state_ptr, operation->state_len);
+    }
+}
+
+zfh_request BuildZfhRequest(
+    const PreparedRequest &prepared,
+    ZigOperationState *operation
+) {
+    zfh_request request{};
+    request.struct_size = ZFH_REQUEST_STRUCT_SIZE;
+    request.options_ptr = prepared.has_options ? &prepared.options : nullptr;
+    if (operation != nullptr) {
+        request.operation_ptr = operation->state_ptr;
+        request.operation_len = operation->state_len;
+    }
+    return request;
+}
+
+struct ZigStreamState {
+    std::vector<uint8_t> storage;
+    void *state_ptr = nullptr;
+    size_t state_len = 0;
+    ZigOperationState operation;
+    bool has_operation = false;
+    std::string operation_id;
+};
+
+bool InitStreamStateInplace(
+    zfh_algorithm algorithm,
+    const PreparedRequest &prepared,
+    const std::string &operation_id,
+    ZigStreamState *state,
+    zfh_error *out_error
+) {
+    if (!operation_id.empty()) {
+        if (!InitOperationState(&state->operation, out_error)) {
+            return false;
+        }
+        state->has_operation = true;
+        state->operation_id = operation_id;
+        RegisterOperation(operation_id, &state->operation);
+    }
+
+    if (!InitAlignedStorage(
+            zfh_hasher_state_size(),
+            zfh_hasher_state_align(),
+            &state->storage,
+            &state->state_ptr,
+            &state->state_len
+        )) {
+        *out_error = ZFH_UNKNOWN_ERROR;
+        if (state->has_operation) {
+            UnregisterOperation(state->operation_id, &state->operation);
+            state->has_operation = false;
+        }
+        return false;
+    }
+
+    zfh_request request = BuildZfhRequest(prepared, state->has_operation ? &state->operation : nullptr);
+    const zfh_request *request_ptr =
+        (prepared.has_options || state->has_operation) ? &request : nullptr;
 
     *out_error = zfh_hasher_init_inplace(
         algorithm,
-        options_ptr,
+        request_ptr,
         state->state_ptr,
         state->state_len
     );
+    if (*out_error != ZFH_OK && state->has_operation) {
+        UnregisterOperation(state->operation_id, &state->operation);
+        state->has_operation = false;
+    }
     return *out_error == ZFH_OK;
 }
 
@@ -255,65 +383,46 @@ bool StringHash(
     const std::vector<uint8_t> &data,
     bool has_key,
     const std::vector<uint8_t> &key,
+    const std::string &operation_id,
     std::vector<uint8_t> *out_digest
 ) {
     PreparedRequest request{};
     if (!PrepareRequest(env, algorithm_name, has_key, key, &request)) {
         return false;
+    }
+
+    ZigOperationState operation{};
+    ZigOperationState *operation_ptr = nullptr;
+    if (!operation_id.empty()) {
+        zfh_error operation_error = ZFH_OK;
+        if (!InitOperationState(&operation, &operation_error)) {
+            return ThrowForZfhError(env, operation_error, "zfh_operation_init_inplace");
+        }
+        operation_ptr = &operation;
+        RegisterOperation(operation_id, operation_ptr);
     }
 
     std::vector<uint8_t> digest(zfh_max_digest_length());
     size_t written = 0;
     const uint8_t *data_ptr = data.empty() ? &filehash::jni::kEmptyByte : data.data();
+    zfh_request zfh_request_value = BuildZfhRequest(request, operation_ptr);
+    const zfh_request *request_ptr =
+        (request.has_options || operation_ptr != nullptr) ? &zfh_request_value : nullptr;
 
     const zfh_error code = zfh_string_hash(
         request.algorithm,
         data_ptr,
         data.size(),
-        request.options_ptr,
+        request_ptr,
         digest.data(),
         digest.size(),
         &written
     );
+    if (operation_ptr != nullptr) {
+        UnregisterOperation(operation_id, operation_ptr);
+    }
     if (code != ZFH_OK) {
         return ThrowForZfhError(env, code, "zfh_string_hash");
-    }
-
-    digest.resize(written);
-    *out_digest = std::move(digest);
-    return true;
-}
-
-bool FileHash(
-    JNIEnv *env,
-    const std::string &algorithm_name,
-    const std::string &path,
-    bool has_key,
-    const std::vector<uint8_t> &key,
-    std::vector<uint8_t> *out_digest
-) {
-    PreparedRequest request{};
-    if (!PrepareRequest(env, algorithm_name, has_key, key, &request)) {
-        return false;
-    }
-
-    std::vector<uint8_t> digest(zfh_max_digest_length());
-    size_t written = 0;
-    const uint8_t *path_ptr = path.empty()
-        ? &filehash::jni::kEmptyByte
-        : reinterpret_cast<const uint8_t *>(path.data());
-
-    const zfh_error code = zfh_file_hash(
-        request.algorithm,
-        path_ptr,
-        path.size(),
-        request.options_ptr,
-        digest.data(),
-        digest.size(),
-        &written
-    );
-    if (code != ZFH_OK) {
-        return ThrowForZfhError(env, code, "zfh_file_hash");
     }
 
     digest.resize(written);
@@ -326,6 +435,7 @@ bool StreamHasherCreate(
     const std::string &algorithm_name,
     bool has_key,
     const std::vector<uint8_t> &key,
+    const std::string &operation_id,
     jlong *out_handle
 ) {
     PreparedRequest request{};
@@ -344,7 +454,7 @@ bool StreamHasherCreate(
     }
 
     zfh_error init_error = ZFH_OK;
-    if (!InitStreamStateInplace(request.algorithm, request.options_ptr, state, &init_error)) {
+    if (!InitStreamStateInplace(request.algorithm, request, operation_id, state, &init_error)) {
         delete state;
         return ThrowForZfhError(env, init_error, "zfh_hasher_init_inplace");
     }
@@ -423,7 +533,14 @@ void StreamHasherFree(jlong handle) {
     }
 
     auto *state = reinterpret_cast<ZigStreamState *>(static_cast<intptr_t>(handle));
+    if (state->has_operation) {
+        UnregisterOperation(state->operation_id, &state->operation);
+    }
     delete state;
+}
+
+void CancelOperation(const std::string &operation_id) {
+    CancelOperationById(operation_id);
 }
 
 } // namespace zig

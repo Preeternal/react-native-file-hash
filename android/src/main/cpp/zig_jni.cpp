@@ -7,11 +7,13 @@ Java_com_preeternal_filehash_ZigHasher_stringHash(
     jobject,
     jstring algorithm_j,
     jbyteArray data_j,
-    jbyteArray key_j
+    jbyteArray key_j,
+    jstring operation_id_j
 ) {
     const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
     const std::vector<uint8_t> data = filehash::jni::JByteArrayToVector(env, data_j);
     const std::vector<uint8_t> key = filehash::jni::JByteArrayToVector(env, key_j);
+    const std::string operation_id = filehash::jni::JStringToUtf8(env, operation_id_j);
     std::vector<uint8_t> digest;
 
     if (!filehash::zig::StringHash(
@@ -20,6 +22,7 @@ Java_com_preeternal_filehash_ZigHasher_stringHash(
             data,
             key_j != nullptr,
             key,
+            operation_id,
             &digest
         )) {
         return nullptr;
@@ -43,42 +46,17 @@ Java_com_preeternal_filehash_ZigHasher_hasArm64Sha2(JNIEnv *, jobject) {
     return filehash::zig::HasArm64Sha2() ? JNI_TRUE : JNI_FALSE;
 }
 
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_preeternal_filehash_ZigHasher_fileHash(
-    JNIEnv *env,
-    jobject,
-    jstring algorithm_j,
-    jstring path_j,
-    jbyteArray key_j
-) {
-    const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
-    const std::string path = filehash::jni::JStringToUtf8(env, path_j);
-    const std::vector<uint8_t> key = filehash::jni::JByteArrayToVector(env, key_j);
-    std::vector<uint8_t> digest;
-
-    if (!filehash::zig::FileHash(
-            env,
-            algorithm,
-            path,
-            key_j != nullptr,
-            key,
-            &digest
-        )) {
-        return nullptr;
-    }
-
-    return filehash::jni::MakeJavaByteArray(env, digest.data(), digest.size());
-}
-
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_preeternal_filehash_ZigHasher_streamHasherCreate(
     JNIEnv *env,
     jobject,
     jstring algorithm_j,
-    jbyteArray key_j
+    jbyteArray key_j,
+    jstring operation_id_j
 ) {
     const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
     const std::vector<uint8_t> key = filehash::jni::JByteArrayToVector(env, key_j);
+    const std::string operation_id = filehash::jni::JStringToUtf8(env, operation_id_j);
     jlong handle = 0;
 
     if (!filehash::zig::StreamHasherCreate(
@@ -86,6 +64,7 @@ Java_com_preeternal_filehash_ZigHasher_streamHasherCreate(
             algorithm,
             key_j != nullptr,
             key,
+            operation_id,
             &handle
         )) {
         return 0;
@@ -141,4 +120,14 @@ Java_com_preeternal_filehash_ZigHasher_streamHasherFree(
     jlong handle
 ) {
     filehash::zig::StreamHasherFree(handle);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_preeternal_filehash_ZigHasher_cancelOperation(
+    JNIEnv *env,
+    jobject,
+    jstring operation_id_j
+) {
+    const std::string operation_id = filehash::jni::JStringToUtf8(env, operation_id_j);
+    filehash::zig::CancelOperation(operation_id);
 }

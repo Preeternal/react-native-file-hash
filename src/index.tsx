@@ -24,8 +24,35 @@ type NativeHashOptions = {
 
 type InvalidArgumentError = Error & { code: 'E_INVALID_ARGUMENT' };
 
+type HashAbortError = Error & {
+    code: 'E_CANCELLED';
+    name: 'AbortError';
+    reason?: unknown;
+};
+
 type LegacyHashOptions = HashOptions & {
     mode?: unknown;
+};
+
+export type HashAbortSignal = {
+    readonly aborted: boolean;
+    readonly reason?: unknown;
+    addEventListener(
+        type: 'abort',
+        listener: () => void,
+        options?: { once?: boolean }
+    ): void;
+    removeEventListener(type: 'abort', listener: () => void): void;
+};
+
+export type HashRequest = {
+    algorithm?: THashAlgorithm;
+    hashOptions?: HashOptions;
+    signal?: HashAbortSignal;
+};
+
+export type StringHashRequest = HashRequest & {
+    encoding?: THashEncoding;
 };
 
 type ZigRuntimeDiagnostics = {
@@ -47,17 +74,85 @@ const HMAC_ALGORITHMS: ReadonlyArray<HmacAlgorithm> = [
     'HMAC-SHA-1',
 ] as const;
 
+const DEFAULT_ALGORITHM: THashAlgorithm = 'SHA-256';
+
 const isHmacAlgorithm = (
     algorithm: THashAlgorithm
 ): algorithm is HmacAlgorithm =>
     (HMAC_ALGORITHMS as readonly THashAlgorithm[]).includes(algorithm);
 
 let didWarnHashStringDeprecation = false;
+let nextOperationId = 0;
 
 const createInvalidArgumentError = (message: string): InvalidArgumentError => {
     const error = new Error(message) as InvalidArgumentError;
     error.code = 'E_INVALID_ARGUMENT';
     return error;
+};
+
+const createAbortError = (reason?: unknown): HashAbortError => {
+    const message =
+        typeof reason === 'string' ? reason : 'Hash operation aborted';
+    const error = new Error(message) as HashAbortError;
+    error.name = 'AbortError';
+    error.code = 'E_CANCELLED';
+    error.reason = reason;
+    return error;
+};
+
+const normalizeAbortError = (error: unknown): unknown => {
+    if (
+        error !== null &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as { code?: unknown }).code === 'E_CANCELLED'
+    ) {
+        const abortError = error as HashAbortError;
+        abortError.name = 'AbortError';
+    }
+
+    return error;
+};
+
+const createOperationId = (): string => {
+    nextOperationId += 1;
+    return `file-hash:${nextOperationId}`;
+};
+
+const runWithAbortSignal = async <T,>(
+    signal: HashAbortSignal | undefined,
+    start: (operationId?: string) => Promise<T>
+): Promise<T> => {
+    if (signal === undefined) {
+        return start();
+    }
+
+    if (signal.aborted) {
+        throw createAbortError(signal.reason);
+    }
+
+    const operationId = createOperationId();
+    const abortNativeOperation = (): void => {
+        try {
+            FileHash.cancelOperation(operationId);
+        } catch {
+            // Native may already be torn down; promise cleanup below still runs.
+        }
+    };
+
+    signal.addEventListener('abort', abortNativeOperation, { once: true });
+    try {
+        if (signal.aborted) {
+            abortNativeOperation();
+            throw createAbortError(signal.reason);
+        }
+
+        return await start(operationId);
+    } catch (error) {
+        throw normalizeAbortError(error);
+    } finally {
+        signal.removeEventListener('abort', abortNativeOperation);
+    }
 };
 
 const warnHashStringDeprecationOnce = (): void => {
@@ -124,40 +219,152 @@ const normalizeRuntimeDiagnostics = (
     return { engine: 'native' };
 };
 
+const isRequestObject = (value: unknown): value is HashRequest =>
+    value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeFileHashRequest = (
+    algorithmOrRequest?: THashAlgorithm | HashRequest,
+    options?: HashOptions
+): Required<Pick<HashRequest, 'algorithm'>> &
+    Pick<HashRequest, 'hashOptions' | 'signal'> => {
+    if (isRequestObject(algorithmOrRequest)) {
+        return {
+            algorithm: algorithmOrRequest.algorithm ?? DEFAULT_ALGORITHM,
+            hashOptions: algorithmOrRequest.hashOptions,
+            signal: algorithmOrRequest.signal,
+        };
+    }
+
+    return {
+        algorithm: algorithmOrRequest ?? DEFAULT_ALGORITHM,
+        hashOptions: options,
+        signal: undefined,
+    };
+};
+
+const normalizeStringHashRequest = (
+    algorithmOrRequest?: THashAlgorithm | StringHashRequest,
+    encoding?: THashEncoding,
+    options?: HashOptions
+): Required<Pick<StringHashRequest, 'algorithm' | 'encoding'>> &
+    Pick<StringHashRequest, 'hashOptions' | 'signal'> => {
+    if (isRequestObject(algorithmOrRequest)) {
+        const request = algorithmOrRequest as StringHashRequest;
+        return {
+            algorithm: request.algorithm ?? DEFAULT_ALGORITHM,
+            encoding: request.encoding ?? 'utf8',
+            hashOptions: request.hashOptions,
+            signal: request.signal,
+        };
+    }
+
+    return {
+        algorithm: algorithmOrRequest ?? DEFAULT_ALGORITHM,
+        encoding: encoding ?? 'utf8',
+        hashOptions: options,
+        signal: undefined,
+    };
+};
+
+const nativeFileHash = (
+    filePath: string,
+    algorithm: THashAlgorithm,
+    options: NativeHashOptions,
+    operationId?: string
+): Promise<string> => {
+    return FileHash.fileHash(filePath, algorithm, options, operationId);
+};
+
+const nativeStringHash = (
+    text: string,
+    algorithm: THashAlgorithm,
+    encoding: THashEncoding,
+    options: NativeHashOptions,
+    operationId?: string
+): Promise<string> => {
+    return FileHash.stringHash(text, algorithm, encoding, options, operationId);
+};
+
 /**
  * Calculates the hash of a file.
  * @param filePath The path to the file.
- * @param algorithm The hash algorithm to use.
- * @param options Hash options: key, keyEncoding ('utf8' | 'hex' | 'base64').
+ * @param request Request options: algorithm, hashOptions, signal.
  * Output format is fixed: lowercase hex string.
  * @returns A promise that resolves with a lowercase hex digest string.
  */
+export function fileHash(
+    filePath: string,
+    request?: HashRequest
+): Promise<string>;
+/**
+ * @deprecated Use object-style request: fileHash(filePath, { algorithm, hashOptions, signal }).
+ */
+export function fileHash(
+    filePath: string,
+    algorithm?: THashAlgorithm,
+    options?: HashOptions
+): Promise<string>;
 export async function fileHash(
     filePath: string,
-    algorithm: THashAlgorithm = 'SHA-256',
+    algorithmOrRequest?: THashAlgorithm | HashRequest,
     options?: HashOptions
 ): Promise<string> {
-    const normalized = validateAndNormalizeOptions(algorithm, options);
-    return FileHash.fileHash(filePath, algorithm, normalized);
+    const request = normalizeFileHashRequest(algorithmOrRequest, options);
+    const normalized = validateAndNormalizeOptions(
+        request.algorithm,
+        request.hashOptions
+    );
+
+    return runWithAbortSignal(request.signal, (operationId) =>
+        nativeFileHash(filePath, request.algorithm, normalized, operationId)
+    );
 }
 
 /**
  * Calculates the hash of a string. For large payloads prefer `fileHash` to avoid keeping all data in JS memory.
  * @param text The input string or base64-encoded data.
- * @param algorithm The hash algorithm to use.
- * @param encoding Input encoding: 'utf8' (default) or 'base64'.
- * @param options Hash options: key, keyEncoding ('utf8' | 'hex' | 'base64').
+ * @param request Request options: algorithm, encoding, hashOptions, signal.
  * Output format is fixed: lowercase hex string.
  * @returns A promise that resolves with a lowercase hex digest string.
  */
+export function stringHash(
+    text: string,
+    request?: StringHashRequest
+): Promise<string>;
+/**
+ * @deprecated Use object-style request: stringHash(text, { algorithm, encoding, hashOptions, signal }).
+ */
+export function stringHash(
+    text: string,
+    algorithm?: THashAlgorithm,
+    encoding?: THashEncoding,
+    options?: HashOptions
+): Promise<string>;
 export async function stringHash(
     text: string,
-    algorithm: THashAlgorithm = 'SHA-256',
-    encoding: THashEncoding = 'utf8',
+    algorithmOrRequest?: THashAlgorithm | StringHashRequest,
+    encoding?: THashEncoding,
     options?: HashOptions
 ): Promise<string> {
-    const normalized = validateAndNormalizeOptions(algorithm, options);
-    return FileHash.stringHash(text, algorithm, encoding, normalized);
+    const request = normalizeStringHashRequest(
+        algorithmOrRequest,
+        encoding,
+        options
+    );
+    const normalized = validateAndNormalizeOptions(
+        request.algorithm,
+        request.hashOptions
+    );
+
+    return runWithAbortSignal(request.signal, (operationId) =>
+        nativeStringHash(
+            text,
+            request.algorithm,
+            request.encoding,
+            normalized,
+            operationId
+        )
+    );
 }
 
 /**
@@ -192,6 +399,7 @@ export type {
     THashEncoding,
     TKeyEncoding,
     HashOptions,
+    HashAbortError,
     InvalidArgumentError,
     RuntimeInfo,
     RuntimeDiagnostics,

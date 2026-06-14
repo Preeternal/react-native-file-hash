@@ -37,14 +37,17 @@ export interface Spec extends TurboModule {
     fileHash(
         filePath: string,
         algorithm: THashAlgorithm,
-        options?: HashOptions
+        options?: HashOptions,
+        operationId?: string
     ): Promise<string>;
     stringHash(
         text: string,
         algorithm: THashAlgorithm,
         encoding?: THashEncoding,
-        options?: HashOptions
+        options?: HashOptions,
+        operationId?: string
     ): Promise<string>;
+    cancelOperation(operationId: string): void;
     getRuntimeInfo(): Promise<RuntimeInfo>;
     getRuntimeDiagnostics(): Promise<RuntimeDiagnostics>;
 }

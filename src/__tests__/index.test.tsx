@@ -6,6 +6,7 @@ import {
     getRuntimeDiagnostics,
     getRuntimeInfo,
     stringHash,
+    type HashAbortSignal,
 } from '../index';
 
 const castAlgo = (s: string) => s as THashAlgorithm;
@@ -38,6 +39,7 @@ const DEFAULT_BLAKE3_KEY =
     '3031323334353637383961626364656630313233343536373839616263646566';
 const mockedFileHash = jest.mocked(FileHash.fileHash);
 const mockedStringHash = jest.mocked(FileHash.stringHash);
+const mockedCancelOperation = jest.mocked(FileHash.cancelOperation);
 const mockedGetRuntimeInfo = jest.mocked(FileHash.getRuntimeInfo);
 const mockedGetRuntimeDiagnostics = jest.mocked(FileHash.getRuntimeDiagnostics);
 
@@ -55,6 +57,31 @@ const vectorForRequest = (
     return vector;
 };
 
+const createMockAbortController = () => {
+    let abortListener: (() => void) | undefined;
+    const signal = {
+        aborted: false as boolean,
+        reason: undefined as unknown,
+        addEventListener: jest.fn((_type: 'abort', listener: () => void) => {
+            abortListener = listener;
+        }),
+        removeEventListener: jest.fn((_type: 'abort', listener: () => void) => {
+            if (abortListener === listener) {
+                abortListener = undefined;
+            }
+        }),
+    } satisfies HashAbortSignal;
+
+    return {
+        signal,
+        abort(reason?: unknown) {
+            signal.aborted = true;
+            signal.reason = reason;
+            abortListener?.();
+        },
+    };
+};
+
 describe('fileHash options validation', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -62,7 +89,12 @@ describe('fileHash options validation', () => {
 
     it('passes defaults when options omitted', async () => {
         await fileHash('path');
-        expect(FileHash.fileHash).toHaveBeenCalledWith('path', 'SHA-256', {});
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'path',
+            'SHA-256',
+            {},
+            undefined
+        );
     });
 
     it('requires key for HMAC algorithms', async () => {
@@ -76,10 +108,15 @@ describe('fileHash options validation', () => {
             key: 'secret',
             keyEncoding: 'utf8',
         });
-        expect(FileHash.fileHash).toHaveBeenCalledWith('p', 'HMAC-SHA-256', {
-            key: 'secret',
-            keyEncoding: 'utf8',
-        });
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'HMAC-SHA-256',
+            {
+                key: 'secret',
+                keyEncoding: 'utf8',
+            },
+            undefined
+        );
     });
 
     it('accepts keyed BLAKE3 with key (auto mode)', async () => {
@@ -88,15 +125,25 @@ describe('fileHash options validation', () => {
             key: hexKey,
             keyEncoding: 'hex',
         });
-        expect(FileHash.fileHash).toHaveBeenCalledWith('p', 'BLAKE3', {
-            key: hexKey,
-            keyEncoding: 'hex',
-        });
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'BLAKE3',
+            {
+                key: hexKey,
+                keyEncoding: 'hex',
+            },
+            undefined
+        );
     });
 
     it('accepts BLAKE3 without key (plain mode)', async () => {
         await fileHash('p', castAlgo('BLAKE3'));
-        expect(FileHash.fileHash).toHaveBeenCalledWith('p', 'BLAKE3', {});
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'BLAKE3',
+            {},
+            undefined
+        );
     });
 
     it('rejects key for non-HMAC and non-BLAKE3 algorithms', async () => {
@@ -116,10 +163,15 @@ describe('fileHash options validation', () => {
 
     it('accepts empty key for HMAC (key provided)', async () => {
         await fileHash('p', castAlgo('HMAC-SHA-256'), { key: '' });
-        expect(FileHash.fileHash).toHaveBeenCalledWith('p', 'HMAC-SHA-256', {
-            key: '',
-            keyEncoding: 'utf8',
-        });
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'HMAC-SHA-256',
+            {
+                key: '',
+                keyEncoding: 'utf8',
+            },
+            undefined
+        );
     });
 });
 
@@ -134,7 +186,8 @@ describe('stringHash mirrors validation', () => {
             'abc',
             'SHA-256',
             'utf8',
-            {}
+            {},
+            undefined
         );
     });
 
@@ -150,7 +203,8 @@ describe('stringHash mirrors validation', () => {
             '',
             'SHA-256',
             'utf8',
-            {}
+            {},
+            undefined
         );
     });
 
@@ -163,7 +217,8 @@ describe('stringHash mirrors validation', () => {
             'abc',
             'HMAC-SHA-256',
             'utf8',
-            { key: longKey, keyEncoding: 'utf8' }
+            { key: longKey, keyEncoding: 'utf8' },
+            undefined
         );
     });
 
@@ -176,6 +231,119 @@ describe('stringHash mirrors validation', () => {
             code: 'E_INVALID_ARGUMENT',
             message: expect.stringContaining('`mode` option was removed'),
         });
+    });
+});
+
+describe('HashRequest object API and cancellation', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('uses default file algorithm when request is omitted', async () => {
+        await fileHash('path', {});
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'path',
+            'SHA-256',
+            {},
+            undefined
+        );
+    });
+
+    it('passes object-style file request hash options', async () => {
+        await fileHash('p', {
+            algorithm: castAlgo('HMAC-SHA-256'),
+            hashOptions: {
+                key: 'secret',
+                keyEncoding: 'utf8',
+            },
+        });
+
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'HMAC-SHA-256',
+            {
+                key: 'secret',
+                keyEncoding: 'utf8',
+            },
+            undefined
+        );
+    });
+
+    it('uses default string algorithm and encoding when request fields are omitted', async () => {
+        await stringHash('abc', {});
+        expect(FileHash.stringHash).toHaveBeenCalledWith(
+            'abc',
+            'SHA-256',
+            'utf8',
+            {},
+            undefined
+        );
+    });
+
+    it('passes object-style string request encoding and hash options', async () => {
+        await stringHash('abc', {
+            algorithm: castAlgo('HMAC-SHA-256'),
+            encoding: 'base64',
+            hashOptions: {
+                key: 'secret',
+            },
+        });
+
+        expect(FileHash.stringHash).toHaveBeenCalledWith(
+            'abc',
+            'HMAC-SHA-256',
+            'base64',
+            { key: 'secret', keyEncoding: 'utf8' },
+            undefined
+        );
+    });
+
+    it('rejects before native call when signal is already aborted', async () => {
+        const controller = createMockAbortController();
+        controller.abort('stop');
+
+        await expect(
+            fileHash('p', { signal: controller.signal })
+        ).rejects.toMatchObject({
+            code: 'E_CANCELLED',
+            name: 'AbortError',
+            message: 'stop',
+        });
+        expect(FileHash.fileHash).not.toHaveBeenCalled();
+        expect(FileHash.cancelOperation).not.toHaveBeenCalled();
+    });
+
+    it('cancels native operation when signal aborts during file hash', async () => {
+        const controller = createMockAbortController();
+        let rejectNative:
+            | ((error: Error & { code: string }) => void)
+            | undefined;
+        mockedFileHash.mockImplementationOnce(
+            async () =>
+                new Promise<string>((_resolve, reject) => {
+                    rejectNative = reject;
+                })
+        );
+
+        const promise = fileHash('p', { signal: controller.signal });
+        controller.abort();
+
+        expect(mockedCancelOperation).toHaveBeenCalledTimes(1);
+        expect(mockedCancelOperation.mock.calls[0]?.[0]).toEqual(
+            expect.stringMatching(/^file-hash:/)
+        );
+
+        rejectNative?.(
+            Object.assign(new Error('Hash computation cancelled'), {
+                code: 'E_CANCELLED',
+            })
+        );
+
+        await expect(promise).rejects.toMatchObject({
+            code: 'E_CANCELLED',
+            name: 'AbortError',
+        });
+        expect(controller.signal.removeEventListener).toHaveBeenCalled();
     });
 });
 
@@ -207,7 +375,8 @@ describe('hashString deprecated alias', () => {
             'abc',
             'SHA-256',
             'utf8',
-            {}
+            {},
+            undefined
         );
     });
 });
@@ -344,10 +513,10 @@ describe('runtime info', () => {
     it('returns runtime diagnostics from native module', async () => {
         await expect(getRuntimeDiagnostics()).resolves.toEqual({
             engine: 'zig',
-            zigApiVersion: 2,
-            zigExpectedApiVersion: 2,
+            zigApiVersion: 3,
+            zigExpectedApiVersion: 3,
             zigApiCompatible: true,
-            zigVersion: 'v0.0.3',
+            zigVersion: 'v0.0.5',
         });
         expect(mockedGetRuntimeDiagnostics.mock.calls).toHaveLength(1);
     });

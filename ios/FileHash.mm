@@ -65,6 +65,7 @@ RCT_EXPORT_MODULE();
 - (void)dispatchFileHashRequest:(NSString *)filePath
                       algorithm:(NSString *)algorithm
                         options:(NSDictionary *)options
+                    operationId:(NSString *)operationId
                         resolve:(RCTPromiseResolveBlock)resolve
                          reject:(RCTPromiseRejectBlock)reject
 {
@@ -73,6 +74,7 @@ RCT_EXPORT_MODULE();
     [_zigBridge fileHash:filePath
                algorithm:algorithm
                  options:options
+             operationId:operationId
                  resolve:resolve
                   reject:reject];
 #else
@@ -87,6 +89,7 @@ RCT_EXPORT_MODULE();
   [_nativeBridge fileHash:filePath
                 algorithm:algorithm
                   options:options
+              operationId:operationId
                   resolve:resolve
                    reject:reject];
 #else
@@ -100,6 +103,7 @@ RCT_EXPORT_MODULE();
                         algorithm:(NSString *)algorithm
                          encoding:(NSString *)encoding
                           options:(NSDictionary *)options
+                      operationId:(NSString *)operationId
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject
 {
@@ -109,6 +113,7 @@ RCT_EXPORT_MODULE();
                  algorithm:algorithm
                   encoding:encoding
                    options:options
+              operationId:operationId
                    resolve:resolve
                     reject:reject];
 #else
@@ -124,6 +129,7 @@ RCT_EXPORT_MODULE();
                   algorithm:algorithm
                    encoding:encoding
                     options:options
+                operationId:operationId
                     resolve:resolve
                      reject:reject];
 #else
@@ -142,6 +148,7 @@ RCT_EXPORT_MODULE();
 - (void)fileHash:(NSString *)filePath
        algorithm:(NSString *)algorithm
          options:(JS::NativeFileHash::HashOptions &)options
+     operationId:(NSString *)operationId
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject
 {
@@ -153,6 +160,7 @@ RCT_EXPORT_MODULE();
   [self dispatchFileHashRequest:filePath
                       algorithm:algorithm
                         options:opts
+                    operationId:operationId
                         resolve:resolve
                          reject:reject];
 }
@@ -161,6 +169,7 @@ RCT_EXPORT_MODULE();
           algorithm:(NSString *)algorithm
            encoding:(NSString *)encoding
             options:(JS::NativeFileHash::HashOptions &)options
+        operationId:(NSString *)operationId
             resolve:(RCTPromiseResolveBlock)resolve
              reject:(RCTPromiseRejectBlock)reject
 {
@@ -173,8 +182,23 @@ RCT_EXPORT_MODULE();
                         algorithm:algorithm
                          encoding:encoding
                           options:opts
+                      operationId:operationId
                           resolve:resolve
                            reject:reject];
+}
+
+- (void)cancelOperation:(NSString *)operationId
+{
+  if ([ZFHCurrentEngineName() isEqualToString:@"zig"]) {
+#if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
+    [_zigBridge cancelOperation:operationId];
+#endif
+    return;
+  }
+
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+  [_nativeBridge cancelOperation:operationId];
+#endif
 }
 
 - (void)getRuntimeInfo:(RCTPromiseResolveBlock)resolve
@@ -200,13 +224,15 @@ RCT_EXPORT_MODULE();
 RCT_EXPORT_METHOD(fileHash
                   : (NSString *)filePath algorithm
                   : (NSString *)algorithm options
-                  : (NSDictionary *)options resolve
+                  : (NSDictionary *)options operationId
+                  : (NSString *)operationId resolve
                   : (RCTPromiseResolveBlock)resolve reject
                   : (RCTPromiseRejectBlock)reject)
 {
   [self dispatchFileHashRequest:filePath
                       algorithm:algorithm
                         options:options
+                    operationId:operationId
                         resolve:resolve
                          reject:reject];
 }
@@ -215,7 +241,8 @@ RCT_EXPORT_METHOD(stringHash
                   : (NSString *)text algorithm
                   : (NSString *)algorithm encoding
                   : (NSString *)encoding options
-                  : (NSDictionary *)options resolve
+                  : (NSDictionary *)options operationId
+                  : (NSString *)operationId resolve
                   : (RCTPromiseResolveBlock)resolve reject
                   : (RCTPromiseRejectBlock)reject)
 {
@@ -223,8 +250,15 @@ RCT_EXPORT_METHOD(stringHash
                         algorithm:algorithm
                          encoding:encoding
                           options:options
+                      operationId:operationId
                           resolve:resolve
                            reject:reject];
+}
+
+RCT_EXPORT_METHOD(cancelOperation
+                  : (NSString *)operationId)
+{
+  [self cancelOperation:operationId];
 }
 
 RCT_EXPORT_METHOD(getRuntimeInfo

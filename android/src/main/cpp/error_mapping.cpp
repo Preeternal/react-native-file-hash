@@ -13,13 +13,25 @@ bool ThrowForZfhError(JNIEnv *env, zfh_error code, const char *api_name) {
     switch (code) {
         case ZFH_INVALID_ARGUMENT:
         case ZFH_INVALID_ALGORITHM:
-        case ZFH_BUFFER_TOO_SMALL:
+        case ZFH_OUTPUT_BUFFER_TOO_SMALL:
         case ZFH_KEY_REQUIRED:
         case ZFH_INVALID_KEY_LENGTH:
         case ZFH_INVALID_PATH:
             return filehash::jni::ThrowException(
                 env,
                 "java/lang/IllegalArgumentException",
+                message
+            );
+        case ZFH_OPERATION_CANCELED:
+            return filehash::jni::ThrowException(
+                env,
+                "java/util/concurrent/CancellationException",
+                message
+            );
+        case ZFH_INVALID_STATE:
+            return filehash::jni::ThrowException(
+                env,
+                "java/lang/IllegalStateException",
                 message
             );
         case ZFH_FILE_NOT_FOUND:

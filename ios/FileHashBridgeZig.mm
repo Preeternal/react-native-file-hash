@@ -8,6 +8,8 @@
 
 @implementation FileHashBridgeZig {
   NSOperationQueue *_queue;
+  NSLock *_operationsLock;
+  NSMutableDictionary<NSString *, NSOperation *> *_operationsById;
 }
 
 - (instancetype)init
@@ -17,13 +19,58 @@
     _queue.name = @"FileHashZigQueue";
     _queue.maxConcurrentOperationCount = 2;
     _queue.qualityOfService = NSQualityOfServiceUtility;
+    _operationsLock = [NSLock new];
+    _operationsById = [NSMutableDictionary new];
   }
   return self;
+}
+
+- (void)enqueueOperationWithId:(NSString *)operationId
+                          work:(void (^)(NSOperation *operation))work
+{
+  NSString *trackedId = operationId.length > 0 ? [operationId copy] : nil;
+  NSBlockOperation *operation = [NSBlockOperation new];
+  __weak NSBlockOperation *weakOperation = operation;
+  __weak FileHashBridgeZig *weakSelf = self;
+
+  [operation addExecutionBlock:^{
+    work(weakOperation);
+  }];
+
+  operation.completionBlock = ^{
+    if (trackedId.length == 0) {
+      return;
+    }
+    [weakSelf removeOperationWithId:trackedId operation:weakOperation];
+  };
+
+  if (trackedId.length > 0) {
+    [_operationsLock lock];
+    _operationsById[trackedId] = operation;
+    [_operationsLock unlock];
+  }
+
+  [_queue addOperation:operation];
+}
+
+- (void)removeOperationWithId:(NSString *)operationId operation:(NSOperation *)operation
+{
+  if (operationId.length == 0) {
+    return;
+  }
+
+  [_operationsLock lock];
+  if (_operationsById[operationId] == operation) {
+    [_operationsById removeObjectForKey:operationId];
+  }
+  [_operationsLock unlock];
+  ZFHForgetOperation(operationId);
 }
 
 - (void)fileHash:(NSString *)filePath
        algorithm:(NSString *)algorithm
          options:(NSDictionary *)options
+     operationId:(NSString *)operationId
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject
 {
@@ -31,8 +78,14 @@
     return;
   }
 
-  [_queue addOperationWithBlock:^{
+  [self enqueueOperationWithId:operationId
+                          work:^(NSOperation *operation) {
     @autoreleasepool {
+      if (operation.cancelled || ZFHIsOperationCancelled(operationId)) {
+        reject(@"E_CANCELLED", @"Hash computation cancelled", nil);
+        return;
+      }
+
       NSDictionary *effectiveOptions = options ?: @{};
       if ([algorithm hasPrefix:@"HMAC-"] && effectiveOptions[@"key"] == nil) {
         NSMutableDictionary *patched = [effectiveOptions mutableCopy];
@@ -69,42 +122,24 @@
       }
 
       NSString *normalizedPath = ZFHNormalizePath(filePath);
-      NSData *pathData = [normalizedPath dataUsingEncoding:NSUTF8StringEncoding];
-      BOOL hasPathBytes = (pathData != nil && pathData.length > 0);
-
-      const BOOL canTryDirectPath = hasPathBytes && (!hasUrlContext || isFileUrl);
-      if (canTryDirectPath) {
-        std::vector<uint8_t> out(zfh_max_digest_length());
-        size_t written = 0;
-        zfh_error err = zfh_file_hash(parsedAlgorithm,
-                                      (const uint8_t *)pathData.bytes,
-                                      pathData.length,
-                                      optionsPtr,
-                                      out.data(),
-                                      out.size(),
-                                      &written);
-        if (err == ZFH_OK) {
-          resolve(ZFHHexString(out.data(), written));
-          return;
-        }
-
-        const BOOL shouldTryUrlFallback =
-            hasUrlContext && isFileUrl &&
-            (err == ZFH_ACCESS_DENIED || err == ZFH_FILE_NOT_FOUND || err == ZFH_INVALID_PATH ||
-             err == ZFH_IO_ERROR);
-        if (shouldTryUrlFallback) {
-          (void)ZFHHashFileURLWithZigStreaming(
-              inputURL, parsedAlgorithm, optionsPtr, resolve, reject);
-          return;
-        }
-
-        ZFHRejectZigError(err, reject);
-        return;
+      NSURL *streamURL = nil;
+      if (hasUrlContext && isFileUrl) {
+        streamURL = inputURL;
+      } else if (!hasUrlContext) {
+        streamURL = [NSURL fileURLWithPath:normalizedPath];
       }
 
-      if (hasUrlContext && isFileUrl) {
-        (void)ZFHHashFileURLWithZigStreaming(
-            inputURL, parsedAlgorithm, optionsPtr, resolve, reject);
+      if (streamURL != nil) {
+        if (operation.cancelled || ZFHIsOperationCancelled(operationId)) {
+          reject(@"E_CANCELLED", @"Hash computation cancelled", nil);
+          return;
+        }
+        (void)ZFHHashFileURLWithZigStreaming(streamURL,
+                                             parsedAlgorithm,
+                                             optionsPtr,
+                                             operationId,
+                                             resolve,
+                                             reject);
         return;
       }
 
@@ -117,6 +152,7 @@
          algorithm:(NSString *)algorithm
           encoding:(NSString *)encoding
            options:(NSDictionary *)options
+      operationId:(NSString *)operationId
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject
 {
@@ -124,8 +160,14 @@
     return;
   }
 
-  [_queue addOperationWithBlock:^{
+  [self enqueueOperationWithId:operationId
+                          work:^(NSOperation *operation) {
     @autoreleasepool {
+      if (operation.cancelled || ZFHIsOperationCancelled(operationId)) {
+        reject(@"E_CANCELLED", @"Hash computation cancelled", nil);
+        return;
+      }
+
       NSDictionary *effectiveOptions = options ?: @{};
       if ([algorithm hasPrefix:@"HMAC-"] && effectiveOptions[@"key"] == nil) {
         NSMutableDictionary *patched = [effectiveOptions mutableCopy];
@@ -159,10 +201,14 @@
 
       std::vector<uint8_t> out(zfh_max_digest_length());
       size_t written = 0;
+      zfh_request request = {};
+      request.struct_size = ZFH_REQUEST_STRUCT_SIZE;
+      request.options_ptr = optionsPtr;
+      const zfh_request *requestPtr = optionsPtr != NULL ? &request : NULL;
       zfh_error err = zfh_string_hash(parsedAlgorithm,
                                       (const uint8_t *)inputData.bytes,
                                       inputData.length,
-                                      optionsPtr,
+                                      requestPtr,
                                       out.data(),
                                       out.size(),
                                       &written);
@@ -176,8 +222,25 @@
   }];
 }
 
+- (void)cancelOperation:(NSString *)operationId
+{
+  if (operationId.length == 0) {
+    return;
+  }
+
+  ZFHCancelOperation(operationId);
+}
+
 - (void)invalidate
 {
+  [_operationsLock lock];
+  NSArray<NSOperation *> *operations = _operationsById.allValues;
+  [_operationsById removeAllObjects];
+  [_operationsLock unlock];
+
+  for (NSOperation *operation in operations) {
+    [operation cancel];
+  }
   [_queue cancelAllOperations];
 }
 

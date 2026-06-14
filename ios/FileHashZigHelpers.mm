@@ -4,6 +4,108 @@
 #include <vector>
 #include <cstdint>
 #include <cerrno>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
+static BOOL ZFHIsPowerOfTwo(size_t value);
+
+struct ZFHOperationStateStorage {
+  std::vector<uint8_t> storage;
+  void *statePtr = nullptr;
+  size_t stateLen = 0;
+};
+
+static std::mutex ZFHOperationMutex;
+static std::unordered_map<std::string, ZFHOperationStateStorage *> ZFHOperations;
+static std::unordered_set<std::string> ZFHCancelledOperationIds;
+
+static std::string ZFHOperationIdString(NSString *operationId)
+{
+  if (operationId == nil || operationId.length == 0) {
+    return {};
+  }
+
+  const char *utf8 = operationId.UTF8String;
+  return utf8 != NULL ? std::string(utf8) : std::string();
+}
+
+static BOOL ZFHInitAlignedStorage(size_t requiredSize,
+                                  size_t requiredAlign,
+                                  std::vector<uint8_t> *storage,
+                                  void **outPtr,
+                                  size_t *outLen)
+{
+  if (requiredSize == 0 || requiredAlign == 0 || !ZFHIsPowerOfTwo(requiredAlign)) {
+    return NO;
+  }
+
+  const size_t capacity = requiredSize + requiredAlign - 1;
+  storage->resize(capacity);
+  uintptr_t baseAddr = reinterpret_cast<uintptr_t>(storage->data());
+  uintptr_t alignedAddr =
+      (baseAddr + (requiredAlign - 1)) &
+      ~(static_cast<uintptr_t>(requiredAlign - 1));
+  *outPtr = reinterpret_cast<void *>(alignedAddr);
+  *outLen = capacity - static_cast<size_t>(alignedAddr - baseAddr);
+  return YES;
+}
+
+static zfh_error ZFHInitOperationState(ZFHOperationStateStorage *operation)
+{
+  if (!ZFHInitAlignedStorage(zfh_operation_state_size(),
+                             zfh_operation_state_align(),
+                             &operation->storage,
+                             &operation->statePtr,
+                             &operation->stateLen)) {
+    return ZFH_UNKNOWN_ERROR;
+  }
+
+  return zfh_operation_init_inplace(operation->statePtr, operation->stateLen);
+}
+
+static void ZFHRegisterOperation(const std::string &operationId,
+                                 ZFHOperationStateStorage *operation)
+{
+  if (operationId.empty() || operation == nullptr) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(ZFHOperationMutex);
+  ZFHOperations[operationId] = operation;
+  if (ZFHCancelledOperationIds.erase(operationId) > 0) {
+    (void)zfh_operation_cancel(operation->statePtr, operation->stateLen);
+  }
+}
+
+static void ZFHUnregisterOperation(const std::string &operationId,
+                                   ZFHOperationStateStorage *operation)
+{
+  if (operationId.empty()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(ZFHOperationMutex);
+  auto it = ZFHOperations.find(operationId);
+  if (it != ZFHOperations.end() && it->second == operation) {
+    ZFHOperations.erase(it);
+  }
+  ZFHCancelledOperationIds.erase(operationId);
+}
+
+struct ZFHOperationGuard {
+  std::string operationId;
+  ZFHOperationStateStorage *operation = nullptr;
+  bool registered = false;
+
+  ~ZFHOperationGuard()
+  {
+    if (registered) {
+      ZFHUnregisterOperation(operationId, operation);
+    }
+  }
+};
 
 static BOOL ZFHParseAlgorithm(NSString *algorithm, zfh_algorithm *out)
 {
@@ -68,8 +170,12 @@ static NSString *ZFHRNCodeForError(zfh_error code)
       return @"E_INVALID_ARGUMENT";
     case ZFH_INVALID_ALGORITHM:
       return @"E_UNSUPPORTED_ALGORITHM";
-    case ZFH_BUFFER_TOO_SMALL:
+    case ZFH_OUTPUT_BUFFER_TOO_SMALL:
       return @"E_BUFFER_TOO_SMALL";
+    case ZFH_OPERATION_CANCELED:
+      return @"E_CANCELLED";
+    case ZFH_INVALID_STATE:
+      return @"E_INVALID_STATE";
     case ZFH_KEY_REQUIRED:
     case ZFH_INVALID_KEY_LENGTH:
       return @"E_INVALID_KEY";
@@ -296,9 +402,54 @@ void ZFHRejectZigError(zfh_error err, RCTPromiseRejectBlock reject)
   reject(ZFHRNCodeForError(err), message, nil);
 }
 
+void ZFHCancelOperation(NSString *operationId)
+{
+  const std::string id = ZFHOperationIdString(operationId);
+  if (id.empty()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(ZFHOperationMutex);
+  auto it = ZFHOperations.find(id);
+  if (it == ZFHOperations.end()) {
+    ZFHCancelledOperationIds.insert(id);
+    return;
+  }
+
+  ZFHOperationStateStorage *operation = it->second;
+  if (operation != nullptr) {
+    (void)zfh_operation_cancel(operation->statePtr, operation->stateLen);
+  }
+}
+
+BOOL ZFHIsOperationCancelled(NSString *operationId)
+{
+  const std::string id = ZFHOperationIdString(operationId);
+  if (id.empty()) {
+    return NO;
+  }
+
+  std::lock_guard<std::mutex> lock(ZFHOperationMutex);
+  return ZFHCancelledOperationIds.find(id) != ZFHCancelledOperationIds.end();
+}
+
+void ZFHForgetOperation(NSString *operationId)
+{
+  const std::string id = ZFHOperationIdString(operationId);
+  if (id.empty()) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(ZFHOperationMutex);
+  if (ZFHOperations.find(id) == ZFHOperations.end()) {
+    ZFHCancelledOperationIds.erase(id);
+  }
+}
+
 BOOL ZFHHashFileURLWithZigStreaming(NSURL *streamURL,
                                     zfh_algorithm algorithm,
                                     const zfh_options *optionsPtr,
+                                    NSString *operationId,
                                     RCTPromiseResolveBlock resolve,
                                     RCTPromiseRejectBlock reject)
 {
@@ -307,24 +458,44 @@ BOOL ZFHHashFileURLWithZigStreaming(NSURL *streamURL,
     return NO;
   }
 
-  const size_t requiredStateSize = zfh_hasher_state_size();
-  const size_t requiredStateAlign = zfh_hasher_state_align();
-  if (requiredStateSize == 0 || requiredStateAlign == 0 ||
-      !ZFHIsPowerOfTwo(requiredStateAlign)) {
+  ZFHOperationStateStorage operationStorage;
+  ZFHOperationGuard operationGuard;
+  const std::string operationIdString = ZFHOperationIdString(operationId);
+  if (!operationIdString.empty()) {
+    zfh_error operationErr = ZFHInitOperationState(&operationStorage);
+    if (operationErr != ZFH_OK) {
+      ZFHRejectZigError(operationErr, reject);
+      return NO;
+    }
+    ZFHRegisterOperation(operationIdString, &operationStorage);
+    operationGuard.operationId = operationIdString;
+    operationGuard.operation = &operationStorage;
+    operationGuard.registered = true;
+  }
+
+  std::vector<uint8_t> stateStorage;
+  void *statePtr = nullptr;
+  size_t stateLen = 0;
+  if (!ZFHInitAlignedStorage(zfh_hasher_state_size(),
+                             zfh_hasher_state_align(),
+                             &stateStorage,
+                             &statePtr,
+                             &stateLen)) {
     reject(@"E_HASH_FAILED", @"Invalid Zig hasher state requirements", nil);
     return NO;
   }
 
-  std::vector<uint8_t> stateStorage(requiredStateSize + requiredStateAlign - 1);
-  const uintptr_t baseAddr = reinterpret_cast<uintptr_t>(stateStorage.data());
-  const uintptr_t alignedAddr =
-      (baseAddr + (requiredStateAlign - 1)) &
-      ~(static_cast<uintptr_t>(requiredStateAlign - 1));
-  void *statePtr = reinterpret_cast<void *>(alignedAddr);
-  const size_t stateLen =
-      stateStorage.size() - static_cast<size_t>(alignedAddr - baseAddr);
+  zfh_request request = {};
+  request.struct_size = ZFH_REQUEST_STRUCT_SIZE;
+  request.options_ptr = optionsPtr;
+  if (operationGuard.registered) {
+    request.operation_ptr = operationStorage.statePtr;
+    request.operation_len = operationStorage.stateLen;
+  }
+  const zfh_request *requestPtr =
+      (optionsPtr != NULL || operationGuard.registered) ? &request : NULL;
 
-  zfh_error err = zfh_hasher_init_inplace(algorithm, optionsPtr, statePtr, stateLen);
+  zfh_error err = zfh_hasher_init_inplace(algorithm, requestPtr, statePtr, stateLen);
   if (err != ZFH_OK) {
     ZFHRejectZigError(err, reject);
     return NO;

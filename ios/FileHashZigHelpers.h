@@ -24,9 +24,16 @@ NSData *_Nullable ZFHDecodeInputData(NSString *_Nonnull text,
 
 void ZFHRejectZigError(zfh_error err, RCTPromiseRejectBlock _Nonnull reject);
 
+void ZFHCancelOperation(NSString *_Nonnull operationId);
+
+BOOL ZFHIsOperationCancelled(NSString *_Nonnull operationId);
+
+void ZFHForgetOperation(NSString *_Nonnull operationId);
+
 BOOL ZFHHashFileURLWithZigStreaming(NSURL *_Nonnull streamURL,
                                     zfh_algorithm algorithm,
                                     const zfh_options *_Nullable optionsPtr,
+                                    NSString *_Nullable operationId,
                                     RCTPromiseResolveBlock _Nonnull resolve,
                                     RCTPromiseRejectBlock _Nonnull reject);
 #endif

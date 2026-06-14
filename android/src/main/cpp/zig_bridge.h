@@ -21,15 +21,7 @@ bool StringHash(
     const std::vector<uint8_t> &data,
     bool has_key,
     const std::vector<uint8_t> &key,
-    std::vector<uint8_t> *out_digest
-);
-
-bool FileHash(
-    JNIEnv *env,
-    const std::string &algorithm_name,
-    const std::string &path,
-    bool has_key,
-    const std::vector<uint8_t> &key,
+    const std::string &operation_id,
     std::vector<uint8_t> *out_digest
 );
 
@@ -38,6 +30,7 @@ bool StreamHasherCreate(
     const std::string &algorithm_name,
     bool has_key,
     const std::vector<uint8_t> &key,
+    const std::string &operation_id,
     jlong *out_handle
 );
 
@@ -54,6 +47,8 @@ bool StreamHasherFinal(
 );
 
 void StreamHasherFree(jlong handle);
+
+void CancelOperation(const std::string &operation_id);
 
 } // namespace zig
 } // namespace filehash

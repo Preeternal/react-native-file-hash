@@ -18,52 +18,79 @@ internal class NativeHashEngine(
     override suspend fun fileHash(
         filePath: String,
         algorithm: String,
-        key: ByteArray?
+        key: ByteArray?,
+        operation: HashOperation?
     ): String = withContext(Dispatchers.IO) {
+        operation?.throwIfCancelled()
         validateKeyUsage(algorithm, key)
-        return@withContext if (isHmacAlgorithm(algorithm)) {
-            hashFileHmac(filePath, algorithm, key ?: error("validated"))
+        val result = if (isHmacAlgorithm(algorithm)) {
+            hashFileHmac(filePath, algorithm, key ?: error("validated"), operation)
         } else if (algorithm == "BLAKE3" && key != null) {
-            hashBlake3FileKeyed(filePath, key)
+            hashBlake3FileKeyed(filePath, key, operation)
         } else {
-            computeHashForFile(filePath, algorithm)
+            computeHashForFile(filePath, algorithm, operation)
         }
+        operation?.throwIfCancelled()
+        return@withContext result
     }
 
     override fun stringHash(
         bytes: ByteArray,
         algorithm: String,
-        key: ByteArray?
+        key: ByteArray?,
+        operation: HashOperation?
     ): String {
+        operation?.throwIfCancelled()
         validateKeyUsage(algorithm, key)
-        return if (isHmacAlgorithm(algorithm)) {
+        val result = if (isHmacAlgorithm(algorithm)) {
             hmacBytes(bytes, algorithm, key ?: error("validated"))
         } else if (algorithm == "BLAKE3" && key != null) {
             hashBlake3BytesKeyed(bytes, key)
         } else {
             computeHashForBytes(bytes, algorithm)
         }
+        operation?.throwIfCancelled()
+        return result
     }
 
-    private fun computeHashForFile(filePath: String, algorithm: String): String =
-        openInputStream(reactContext, filePath).use { stream ->
+    private fun computeHashForFile(
+        filePath: String,
+        algorithm: String,
+        operation: HashOperation?
+    ): String {
+        val inputStream = openInputStream(reactContext, filePath)
+        return if (operation != null) {
+            operation.useCloseable(inputStream) { stream ->
+                stream.use { computeHashForStream(it, algorithm, operation) }
+            }
+        } else {
+            inputStream.use { stream -> computeHashForStream(stream, algorithm, null) }
+        }
+    }
+
+    private fun computeHashForStream(
+        stream: InputStream,
+        algorithm: String,
+        operation: HashOperation?
+    ): String =
             when (algorithm) {
-                "XXH3-64" -> hashXXH3(stream, is128 = false)
-                "XXH3-128" -> hashXXH3(stream, is128 = true)
-                "BLAKE3" -> hashBlake3(stream)
+                "XXH3-64" -> hashXXH3(stream, is128 = false, operation)
+                "XXH3-128" -> hashXXH3(stream, is128 = true, operation)
+                "BLAKE3" -> hashBlake3(stream, operation)
                 "SHA-512/224" -> hashSha512tWithProviderFallback(
                     stream = stream,
                     algorithm = algorithm,
-                    variant = Sha512t.Variant.SHA_512_224
+                    variant = Sha512t.Variant.SHA_512_224,
+                    operation = operation
                 )
                 "SHA-512/256" -> hashSha512tWithProviderFallback(
                     stream = stream,
                     algorithm = algorithm,
-                    variant = Sha512t.Variant.SHA_512_256
+                    variant = Sha512t.Variant.SHA_512_256,
+                    operation = operation
                 )
-                else -> hashWithMessageDigest(stream, algorithm)
+                else -> hashWithMessageDigest(stream, algorithm, operation)
             }
-        }
 
     private fun computeHashForBytes(bytes: ByteArray, algorithm: String): String = when (algorithm) {
         "XXH3-64" -> hashXXH3Bytes(bytes, is128 = false)
@@ -82,26 +109,49 @@ internal class NativeHashEngine(
         else -> hashWithMessageDigest(bytes, algorithm)
     }
 
-    private fun hashFileHmac(filePath: String, algorithm: String, key: ByteArray): String =
-        openInputStream(reactContext, filePath).use { stream ->
-            if (key.isEmpty()) {
-                return@use toHex(computeHmacForStream(stream, algorithm, key))
+    private fun hashFileHmac(
+        filePath: String,
+        algorithm: String,
+        key: ByteArray,
+        operation: HashOperation?
+    ): String {
+        val inputStream = openInputStream(reactContext, filePath)
+        return if (operation != null) {
+            operation.useCloseable(inputStream) { stream ->
+                stream.use { hashFileHmacStream(it, algorithm, key, operation) }
             }
-
-            val mac = Mac.getInstance(
-                hmacJavaName(algorithm)
-                    ?: throw IllegalArgumentException("Unsupported HMAC algorithm: $algorithm")
-            )
-            mac.init(SecretKeySpec(key, mac.algorithm))
-            val buffer = ByteArray(bufferSize)
-            var read: Int
-            while (stream.read(buffer).also { read = it } != -1) {
-                if (read > 0) {
-                    mac.update(buffer, 0, read)
-                }
-            }
-            toHex(mac.doFinal())
+        } else {
+            inputStream.use { stream -> hashFileHmacStream(stream, algorithm, key, null) }
         }
+    }
+
+    private fun hashFileHmacStream(
+        stream: InputStream,
+        algorithm: String,
+        key: ByteArray,
+        operation: HashOperation?
+    ): String {
+        if (key.isEmpty()) {
+            return toHex(computeHmacForStream(stream, algorithm, key, operation))
+        }
+
+        val mac = Mac.getInstance(
+            hmacJavaName(algorithm)
+                ?: throw IllegalArgumentException("Unsupported HMAC algorithm: $algorithm")
+        )
+        mac.init(SecretKeySpec(key, mac.algorithm))
+        val buffer = ByteArray(bufferSize)
+        var read: Int
+        operation?.throwIfCancelled()
+        while (stream.read(buffer).also { read = it } != -1) {
+            operation?.throwIfCancelled()
+            if (read > 0) {
+                mac.update(buffer, 0, read)
+            }
+        }
+        operation?.throwIfCancelled()
+        return toHex(mac.doFinal())
+    }
 
     private fun hmacBytes(bytes: ByteArray, algorithm: String, key: ByteArray): String {
         if (key.isEmpty()) {
@@ -117,44 +167,78 @@ internal class NativeHashEngine(
         return toHex(mac.doFinal())
     }
 
-    private fun hashBlake3FileKeyed(filePath: String, key: ByteArray): String =
-        openInputStream(reactContext, filePath).use { stream ->
-            val state = NativeHasher.blake3InitKeyed(key)
-            require(state != 0L) { "Failed to allocate BLAKE3 keyed state" }
-            val buffer = ByteArray(bufferSize)
-            var read: Int
-            try {
-                while (stream.read(buffer).also { read = it } != -1) {
-                    if (read > 0) {
-                        NativeHasher.blake3Update(state, buffer, read)
-                    }
-                }
-                toHex(NativeHasher.blake3Digest(state))
-            } finally {
-                NativeHasher.blake3Free(state)
+    private fun hashBlake3FileKeyed(
+        filePath: String,
+        key: ByteArray,
+        operation: HashOperation?
+    ): String {
+        val inputStream = openInputStream(reactContext, filePath)
+        return if (operation != null) {
+            operation.useCloseable(inputStream) { stream ->
+                stream.use { hashBlake3FileKeyedStream(it, key, operation) }
             }
+        } else {
+            inputStream.use { stream -> hashBlake3FileKeyedStream(stream, key, null) }
         }
+    }
 
-    private fun hashWithMessageDigest(stream: InputStream, algorithm: String): String {
+    private fun hashBlake3FileKeyedStream(
+        stream: InputStream,
+        key: ByteArray,
+        operation: HashOperation?
+    ): String {
+        val state = NativeHasher.blake3InitKeyed(key)
+        require(state != 0L) { "Failed to allocate BLAKE3 keyed state" }
+        val buffer = ByteArray(bufferSize)
+        var read: Int
+        try {
+            operation?.throwIfCancelled()
+            while (stream.read(buffer).also { read = it } != -1) {
+                operation?.throwIfCancelled()
+                if (read > 0) {
+                    NativeHasher.blake3Update(state, buffer, read)
+                }
+            }
+            operation?.throwIfCancelled()
+            return toHex(NativeHasher.blake3Digest(state))
+        } finally {
+            NativeHasher.blake3Free(state)
+        }
+    }
+
+    private fun hashWithMessageDigest(
+        stream: InputStream,
+        algorithm: String,
+        operation: HashOperation?
+    ): String {
         val digest = resolveMessageDigest(algorithm)
         val buffer = ByteArray(bufferSize)
         var read: Int
+        operation?.throwIfCancelled()
         while (stream.read(buffer).also { read = it } != -1) {
+            operation?.throwIfCancelled()
             if (read > 0) {
                 digest.update(buffer, 0, read)
             }
         }
+        operation?.throwIfCancelled()
         return toHex(digest.digest())
     }
 
-    private fun hashXXH3(stream: InputStream, is128: Boolean): String {
+    private fun hashXXH3(
+        stream: InputStream,
+        is128: Boolean,
+        operation: HashOperation?
+    ): String {
         val state = if (is128) NativeHasher.xxh3Init128() else NativeHasher.xxh3Init64()
         require(state != 0L) { "Failed to allocate XXH3 state" }
 
         val buffer = ByteArray(bufferSize)
         var read: Int
         try {
+            operation?.throwIfCancelled()
             while (stream.read(buffer).also { read = it } != -1) {
+                operation?.throwIfCancelled()
                 if (read > 0) {
                     if (is128) {
                         NativeHasher.xxh3Update128(state, buffer, read)
@@ -163,6 +247,7 @@ internal class NativeHashEngine(
                     }
                 }
             }
+            operation?.throwIfCancelled()
 
             return if (is128) {
                 toHex(NativeHasher.xxh3Digest128(state))
@@ -174,18 +259,21 @@ internal class NativeHashEngine(
         }
     }
 
-    private fun hashBlake3(stream: InputStream): String {
+    private fun hashBlake3(stream: InputStream, operation: HashOperation?): String {
         val state = NativeHasher.blake3Init()
         require(state != 0L) { "Failed to allocate BLAKE3 state" }
 
         val buffer = ByteArray(bufferSize)
         var read: Int
         try {
+            operation?.throwIfCancelled()
             while (stream.read(buffer).also { read = it } != -1) {
+                operation?.throwIfCancelled()
                 if (read > 0) {
                     NativeHasher.blake3Update(state, buffer, read)
                 }
             }
+            operation?.throwIfCancelled()
             return toHex(NativeHasher.blake3Digest(state))
         } finally {
             NativeHasher.blake3Free(state)
@@ -201,12 +289,14 @@ internal class NativeHashEngine(
     private fun hashSha512tWithProviderFallback(
         stream: InputStream,
         algorithm: String,
-        variant: Sha512t.Variant
+        variant: Sha512t.Variant,
+        operation: HashOperation?
     ): String {
         return try {
-            hashWithMessageDigest(stream, algorithm)
+            hashWithMessageDigest(stream, algorithm, operation)
         } catch (_: NoSuchAlgorithmException) {
-            toHex(Sha512t.digestStream(stream, bufferSize, variant))
+            operation?.throwIfCancelled()
+            toHex(Sha512t.digestStream(stream, bufferSize, variant, operation))
         }
     }
 
@@ -300,7 +390,8 @@ internal class NativeHashEngine(
     private fun computeHmacForStream(
         stream: InputStream,
         algorithm: String,
-        key: ByteArray
+        key: ByteArray,
+        operation: HashOperation?
     ): ByteArray {
         val spec = hmacSpec(algorithm)
         val inner = resolveMessageDigest(spec.digestAlgorithm)
@@ -310,11 +401,14 @@ internal class NativeHashEngine(
         inner.update(ipad)
         val buffer = ByteArray(bufferSize)
         var read: Int
+        operation?.throwIfCancelled()
         while (stream.read(buffer).also { read = it } != -1) {
+            operation?.throwIfCancelled()
             if (read > 0) {
                 inner.update(buffer, 0, read)
             }
         }
+        operation?.throwIfCancelled()
         val innerDigest = inner.digest()
 
         outer.update(opad)

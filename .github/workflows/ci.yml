@@ -44,7 +44,7 @@ jobs:
               uses: ./.github/actions/setup
 
             - name: Run unit tests
-              run: yarn test --maxWorkers=2 --coverage
+              run: yarn test --maxWorkers=2 --coverage --watchman=false
 
     build-library:
         runs-on: ubuntu-latest

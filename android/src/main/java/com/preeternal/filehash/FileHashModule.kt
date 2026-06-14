@@ -15,6 +15,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import java.security.NoSuchAlgorithmException
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 @ReactModule(name = FileHashModule.NAME)
 class FileHashModule(
@@ -25,6 +27,10 @@ class FileHashModule(
     private val engine = BuildConfig.FILE_HASH_ENGINE.lowercase()
     private val nativeExecutor: HashEngineExecutor by lazy { NativeHashEngine(reactContext) }
     private val zigExecutor: HashEngineExecutor by lazy { ZigHashEngine(reactContext) }
+    private val activeOperations = ConcurrentHashMap<String, HashOperation>()
+    private val cancelledOperationIds = Collections.newSetFromMap(
+        ConcurrentHashMap<String, Boolean>()
+    )
 
     @Volatile private var zigApiChecked = false
     @Volatile private var zigApiCheckFailure: IllegalStateException? = null
@@ -206,14 +212,23 @@ class FileHashModule(
     }
 
     @ReactMethod
-    override fun fileHash(filePath: String, algorithm: String, options: ReadableMap?, promise: Promise) {
+    override fun fileHash(
+        filePath: String,
+        algorithm: String,
+        options: ReadableMap?,
+        operationId: String?,
+        promise: Promise
+    ) {
         val executor = selectExecutorOrReject(algorithm, promise) ?: return
+        val operation = createOperation(operationId)
 
         scope.launch {
             try {
+                operation?.throwIfCancelled()
                 val key = parseKeyOption(options)
                 val algo = validateAlgorithm(algorithm)
-                val hex = executor.fileHash(filePath, algo, key)
+                val hex = executor.fileHash(filePath, algo, key, operation)
+                operation?.throwIfCancelled()
                 promise.resolve(hex)
             } catch (e: IllegalArgumentException) {
                 promise.reject("E_INVALID_ARGUMENT", e.message, e)
@@ -224,17 +239,32 @@ class FileHashModule(
             } catch (ce: CancellationException) {
                 promise.reject("E_CANCELLED", "Hash computation cancelled")
             } catch (e: Exception) {
-                promise.reject(ERROR_HASH_FAILED, "Failed to compute hash for algorithm $algorithm", e)
+                if (operation?.isCancelled == true) {
+                    promise.reject("E_CANCELLED", "Hash computation cancelled")
+                } else {
+                    promise.reject(ERROR_HASH_FAILED, "Failed to compute hash for algorithm $algorithm", e)
+                }
+            } finally {
+                finishOperation(operation)
             }
         }
     }
 
     @ReactMethod
-    override fun stringHash(text: String, algorithm: String, encoding: String?, options: ReadableMap?, promise: Promise) {
+    override fun stringHash(
+        text: String,
+        algorithm: String,
+        encoding: String?,
+        options: ReadableMap?,
+        operationId: String?,
+        promise: Promise
+    ) {
         val executor = selectExecutorOrReject(algorithm, promise) ?: return
+        val operation = createOperation(operationId)
 
         scope.launch {
             try {
+                operation?.throwIfCancelled()
                 val key = parseKeyOption(options)
                 val algo = validateAlgorithm(algorithm)
                 val enc = encoding?.lowercase() ?: "utf8"
@@ -248,7 +278,8 @@ class FileHashModule(
                     else -> text.toByteArray(Charsets.UTF_8)
                 }
 
-                val hex = executor.stringHash(bytes, algo, key)
+                val hex = executor.stringHash(bytes, algo, key, operation)
+                operation?.throwIfCancelled()
                 promise.resolve(hex)
             } catch (e: IllegalArgumentException) {
                 promise.reject("E_INVALID_ARGUMENT", e.message, e)
@@ -257,14 +288,56 @@ class FileHashModule(
             } catch (ce: CancellationException) {
                 promise.reject("E_CANCELLED", "Hash computation cancelled")
             } catch (e: Exception) {
-                promise.reject(ERROR_HASH_FAILED, "Failed to compute hash for algorithm $algorithm", e)
+                if (operation?.isCancelled == true) {
+                    promise.reject("E_CANCELLED", "Hash computation cancelled")
+                } else {
+                    promise.reject(ERROR_HASH_FAILED, "Failed to compute hash for algorithm $algorithm", e)
+                }
+            } finally {
+                finishOperation(operation)
+            }
+        }
+    }
+
+    @ReactMethod
+    override fun cancelOperation(operationId: String) {
+        if (operationId.isBlank()) return
+
+        cancelledOperationIds.add(operationId)
+        activeOperations[operationId]?.cancel()
+
+        if (engine == "zig") {
+            try {
+                ZigHasher.cancelOperation(operationId)
+            } catch (_: UnsatisfiedLinkError) {
+                // Runtime compatibility checks surface this on active operations.
             }
         }
     }
 
     override fun invalidate() {
         super.invalidate()
+        activeOperations.values.forEach { it.cancel() }
+        activeOperations.clear()
+        cancelledOperationIds.clear()
         scope.cancel()
+    }
+
+    private fun createOperation(operationId: String?): HashOperation? {
+        if (operationId.isNullOrBlank()) return null
+
+        val operation = HashOperation(operationId)
+        activeOperations[operationId] = operation
+        if (cancelledOperationIds.remove(operationId)) {
+            operation.cancel()
+        }
+        return operation
+    }
+
+    private fun finishOperation(operation: HashOperation?) {
+        if (operation == null) return
+        activeOperations.remove(operation.id, operation)
+        cancelledOperationIds.remove(operation.id)
     }
 
     private fun validateAlgorithm(input: String): String {

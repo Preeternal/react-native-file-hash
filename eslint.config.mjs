@@ -30,6 +30,11 @@ export default defineConfig([
             'lib/',
             'coverage/',
             '.nyc_output/',
+            'android/build/',
+            'android/.cxx/',
+            'example/android/build/',
+            'example/android/app/build/',
+            'example/ios/build/',
         ],
     },
 ]);

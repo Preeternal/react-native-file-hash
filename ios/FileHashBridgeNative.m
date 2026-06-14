@@ -24,16 +24,23 @@
 - (void)fileHash:(NSString *)filePath
        algorithm:(NSString *)algorithm
          options:(NSDictionary *)options
+     operationId:(NSString *)operationId
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject
 {
-  [_impl fileHash:filePath algorithm:algorithm options:options resolve:resolve reject:reject];
+  [_impl fileHash:filePath
+        algorithm:algorithm
+          options:options
+      operationId:operationId
+          resolve:resolve
+           reject:reject];
 }
 
 - (void)stringHash:(NSString *)text
          algorithm:(NSString *)algorithm
           encoding:(NSString *)encoding
            options:(NSDictionary *)options
+      operationId:(NSString *)operationId
            resolve:(RCTPromiseResolveBlock)resolve
             reject:(RCTPromiseRejectBlock)reject
 {
@@ -41,8 +48,14 @@
           algorithm:algorithm
            encoding:encoding
             options:options
+        operationId:operationId
             resolve:resolve
              reject:reject];
+}
+
+- (void)cancelOperation:(NSString *)operationId
+{
+  [_impl cancelOperation:operationId];
 }
 
 - (void)invalidate
