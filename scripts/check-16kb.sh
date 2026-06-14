@@ -44,21 +44,23 @@ if [ -z "$readelf_cmd" ]; then
 fi
 
 readelf_args=(-l -W)
+search_roots=(android/build example/android/build example/android/app/build)
 files=()
 if command -v rg >/dev/null 2>&1; then
   rg_load_align() { rg -n "LOAD|Align"; }
   while IFS= read -r line; do
     [ -n "$line" ] && files+=("$line")
-  done < <(rg --files -g "libfilehash-native.so" android/build example/android/build || true)
+  done < <(rg --files -g "libfilehash-native.so" "${search_roots[@]}" || true)
 else
   rg_load_align() { grep -n -E "LOAD|Align"; }
   while IFS= read -r line; do
     [ -n "$line" ] && files+=("$line")
-  done < <(find android/build example/android/build -name "libfilehash-native.so" 2>/dev/null || true)
+  done < <(find "${search_roots[@]}" -name "libfilehash-native.so" 2>/dev/null || true)
 fi
 
 if [ "${#files[@]}" -eq 0 ]; then
   echo "ERROR: no libfilehash-native.so found; build Android first" >&2
+  echo "Searched: ${search_roots[*]}" >&2
   exit 1
 fi
 
