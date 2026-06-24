@@ -18,17 +18,18 @@ internal class NativeHashEngine(
     override suspend fun fileHash(
         filePath: String,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String = withContext(Dispatchers.IO) {
+        val key = options.key
         operation?.throwIfCancelled()
-        validateKeyUsage(algorithm, key)
+        validateHashOptionsUsage(algorithm, options)
         val result = if (isHmacAlgorithm(algorithm)) {
             hashFileHmac(filePath, algorithm, key ?: error("validated"), operation)
         } else if (algorithm == "BLAKE3" && key != null) {
             hashBlake3FileKeyed(filePath, key, operation)
         } else {
-            computeHashForFile(filePath, algorithm, operation)
+            computeHashForFile(filePath, algorithm, options.seed, operation)
         }
         operation?.throwIfCancelled()
         return@withContext result
@@ -37,17 +38,18 @@ internal class NativeHashEngine(
     override fun stringHash(
         bytes: ByteArray,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String {
+        val key = options.key
         operation?.throwIfCancelled()
-        validateKeyUsage(algorithm, key)
+        validateHashOptionsUsage(algorithm, options)
         val result = if (isHmacAlgorithm(algorithm)) {
             hmacBytes(bytes, algorithm, key ?: error("validated"))
         } else if (algorithm == "BLAKE3" && key != null) {
             hashBlake3BytesKeyed(bytes, key)
         } else {
-            computeHashForBytes(bytes, algorithm)
+            computeHashForBytes(bytes, algorithm, options.seed)
         }
         operation?.throwIfCancelled()
         return result
@@ -56,26 +58,28 @@ internal class NativeHashEngine(
     private fun computeHashForFile(
         filePath: String,
         algorithm: String,
+        seed: Long?,
         operation: HashOperation?
     ): String {
         val inputStream = openInputStream(reactContext, filePath)
         return if (operation != null) {
             operation.useCloseable(inputStream) { stream ->
-                stream.use { computeHashForStream(it, algorithm, operation) }
+                stream.use { computeHashForStream(it, algorithm, seed, operation) }
             }
         } else {
-            inputStream.use { stream -> computeHashForStream(stream, algorithm, null) }
+            inputStream.use { stream -> computeHashForStream(stream, algorithm, seed, null) }
         }
     }
 
     private fun computeHashForStream(
         stream: InputStream,
         algorithm: String,
+        seed: Long?,
         operation: HashOperation?
     ): String =
             when (algorithm) {
-                "XXH3-64" -> hashXXH3(stream, is128 = false, operation)
-                "XXH3-128" -> hashXXH3(stream, is128 = true, operation)
+                "XXH3-64" -> hashXXH3(stream, is128 = false, seed, operation)
+                "XXH3-128" -> hashXXH3(stream, is128 = true, seed, operation)
                 "BLAKE3" -> hashBlake3(stream, operation)
                 "SHA-512/224" -> hashSha512tWithProviderFallback(
                     stream = stream,
@@ -92,9 +96,13 @@ internal class NativeHashEngine(
                 else -> hashWithMessageDigest(stream, algorithm, operation)
             }
 
-    private fun computeHashForBytes(bytes: ByteArray, algorithm: String): String = when (algorithm) {
-        "XXH3-64" -> hashXXH3Bytes(bytes, is128 = false)
-        "XXH3-128" -> hashXXH3Bytes(bytes, is128 = true)
+    private fun computeHashForBytes(
+        bytes: ByteArray,
+        algorithm: String,
+        seed: Long?
+    ): String = when (algorithm) {
+        "XXH3-64" -> hashXXH3Bytes(bytes, is128 = false, seed)
+        "XXH3-128" -> hashXXH3Bytes(bytes, is128 = true, seed)
         "BLAKE3" -> hashBlake3Bytes(bytes)
         "SHA-512/224" -> hashSha512tWithProviderFallback(
             bytes = bytes,
@@ -228,9 +236,14 @@ internal class NativeHashEngine(
     private fun hashXXH3(
         stream: InputStream,
         is128: Boolean,
+        seed: Long?,
         operation: HashOperation?
     ): String {
-        val state = if (is128) NativeHasher.xxh3Init128() else NativeHasher.xxh3Init64()
+        val state = if (is128) {
+            NativeHasher.xxh3Init128(seed ?: 0L, seed != null)
+        } else {
+            NativeHasher.xxh3Init64(seed ?: 0L, seed != null)
+        }
         require(state != 0L) { "Failed to allocate XXH3 state" }
 
         val buffer = ByteArray(bufferSize)
@@ -440,8 +453,12 @@ internal class NativeHashEngine(
         return Pair(ipad, opad)
     }
 
-    private fun hashXXH3Bytes(bytes: ByteArray, is128: Boolean): String {
-        val state = if (is128) NativeHasher.xxh3Init128() else NativeHasher.xxh3Init64()
+    private fun hashXXH3Bytes(bytes: ByteArray, is128: Boolean, seed: Long?): String {
+        val state = if (is128) {
+            NativeHasher.xxh3Init128(seed ?: 0L, seed != null)
+        } else {
+            NativeHasher.xxh3Init64(seed ?: 0L, seed != null)
+        }
         require(state != 0L) { "Failed to allocate XXH3 state" }
         try {
             if (is128) {

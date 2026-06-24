@@ -10,6 +10,8 @@ extern "C" {
 
 void *fh_xxh3_64_init(void);
 void *fh_xxh3_128_init(void);
+void *fh_xxh3_64_init_with_seed(uint64_t seed);
+void *fh_xxh3_128_init_with_seed(uint64_t seed);
 void fh_xxh3_64_update(void *state, const void *data, size_t length);
 void fh_xxh3_128_update(void *state, const void *data, size_t length);
 uint64_t fh_xxh3_64_digest(void *state);

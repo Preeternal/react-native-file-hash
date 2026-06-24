@@ -4,14 +4,14 @@ internal interface HashEngineExecutor {
     suspend fun fileHash(
         filePath: String,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String
 
     fun stringHash(
         bytes: ByteArray,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String
 }

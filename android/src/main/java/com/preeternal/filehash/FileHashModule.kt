@@ -6,6 +6,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.module.annotations.ReactModule
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -225,9 +226,9 @@ class FileHashModule(
         scope.launch {
             try {
                 operation?.throwIfCancelled()
-                val key = parseKeyOption(options)
+                val hashOptions = parseHashOptions(options)
                 val algo = validateAlgorithm(algorithm)
-                val hex = executor.fileHash(filePath, algo, key, operation)
+                val hex = executor.fileHash(filePath, algo, hashOptions, operation)
                 operation?.throwIfCancelled()
                 promise.resolve(hex)
             } catch (e: IllegalArgumentException) {
@@ -265,7 +266,7 @@ class FileHashModule(
         scope.launch {
             try {
                 operation?.throwIfCancelled()
-                val key = parseKeyOption(options)
+                val hashOptions = parseHashOptions(options)
                 val algo = validateAlgorithm(algorithm)
                 val enc = encoding?.lowercase() ?: "utf8"
                 val bytes = when (enc) {
@@ -278,7 +279,7 @@ class FileHashModule(
                     else -> text.toByteArray(Charsets.UTF_8)
                 }
 
-                val hex = executor.stringHash(bytes, algo, key, operation)
+                val hex = executor.stringHash(bytes, algo, hashOptions, operation)
                 operation?.throwIfCancelled()
                 promise.resolve(hex)
             } catch (e: IllegalArgumentException) {
@@ -363,11 +364,53 @@ class FileHashModule(
         }
     }
 
+    private fun parseSeedOption(options: ReadableMap?): Long? {
+        if (options == null || !options.hasKey("seed") || options.isNull("seed")) {
+            return null
+        }
+        require(options.getType("seed") == ReadableType.String) {
+            "Seed must be a non-negative u64 decimal string or 0x hex string"
+        }
+
+        val rawSeed = options.getString("seed") ?: return null
+        val normalized = rawSeed.trim()
+        require(normalized.isNotEmpty()) {
+            "Seed must be a non-negative u64 decimal string or 0x hex string"
+        }
+
+        val (digits, radix) = if (
+            normalized.startsWith("0x", ignoreCase = true)
+        ) {
+            Pair(normalized.substring(2), 16)
+        } else {
+            Pair(normalized, 10)
+        }
+
+        require(digits.isNotEmpty()) {
+            "Seed must be a non-negative u64 decimal string or 0x hex string"
+        }
+
+        return try {
+            java.lang.Long.parseUnsignedLong(digits, radix)
+        } catch (e: NumberFormatException) {
+            throw IllegalArgumentException(
+                "Seed must fit into an unsigned 64-bit integer",
+                e
+            )
+        }
+    }
+
     private fun parseKeyOption(options: ReadableMap?): ByteArray? {
         val keyEncoding = options?.getString("keyEncoding")?.lowercase() ?: "utf8"
         val keyString = options?.getString("key")
         return if (keyString != null) decodeKey(keyString, keyEncoding) else null
     }
+
+    private fun parseHashOptions(options: ReadableMap?): HashRequestOptions =
+        HashRequestOptions(
+            key = parseKeyOption(options),
+            seed = parseSeedOption(options)
+        )
 
     companion object {
         const val NAME = "FileHash"

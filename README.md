@@ -148,6 +148,81 @@ const keyed = await fileHash(fileUri, {
 ```
 
 `keyEncoding` can be `'utf8'`, `'hex'`, or `'base64'`. The default is `'utf8'`.
+For `BLAKE3`, `hashOptions.key` is optional: omit it for regular BLAKE3, pass
+it only when you want keyed BLAKE3.
+
+HMAC algorithms require `hashOptions.key`. If you intentionally need HMAC with
+an empty key, pass `key: ''` explicitly; omitting `key` is rejected.
+
+## Seeded XXH3
+
+`XXH3-64` and `XXH3-128` support an optional unsigned 64-bit seed. Omit it for
+regular unseeded XXH3. A seed is not a secret and does not make XXH3
+cryptographic. It selects a reproducible XXH3 namespace: the same bytes,
+algorithm, and seed produce the same digest on your backend, CLI tools, and
+mobile app.
+
+With the optional `zig` engine, seeded XXH3 currently means `XXH3-64`; `XXH3-128`
+is available only in the default `native` engine.
+
+The most direct use case is server-side verification. For example, your backend
+can publish a download manifest with both the expected XXH3 digest and the seed
+that was used to compute it:
+
+```ts
+import { fileHash } from '@preeternal/react-native-file-hash';
+
+const manifest = {
+  url: 'https://example.com/assets/video.mp4',
+  xxh3Seed: '12345678901234567890',
+  xxh3: '4b5e0a417dfa7ed2fb965bc17c16bd34',
+};
+
+const actual = await fileHash(localFileUri, {
+  algorithm: 'XXH3-128',
+  hashOptions: {
+    seed: manifest.xxh3Seed,
+  },
+});
+
+if (actual !== manifest.xxh3) {
+  throw new Error('Downloaded file failed checksum verification');
+}
+```
+
+Pass large `u64` seeds from a backend as strings, either decimal or `0x` hex.
+JavaScript `number` is safe only up to `Number.MAX_SAFE_INTEGER`; values like
+`12345678901234567890` must be passed as a string or `bigint` so they are not
+rounded before hashing.
+
+For app-owned namespaces, you can derive a stable seed from a readable label:
+
+```ts
+import {
+  fileHash,
+  xxh3SeedFromLabel,
+} from '@preeternal/react-native-file-hash';
+
+const mediaCacheSeed = xxh3SeedFromLabel('media-cache-v1');
+
+const cacheKey = await fileHash(fileUri, {
+  algorithm: 'XXH3-128',
+  hashOptions: {
+    seed: mediaCacheSeed,
+  },
+});
+```
+
+`hashOptions.seed` accepts a `bigint`, a non-negative safe integer, a decimal
+string, or a `0x` hex string. Values are normalized before native hashing, so
+`12345`, `12345n`, and `'0x3039'` all use the same seed.
+
+`xxh3SeedFromLabel(label)` derives a deterministic seed from a UTF-8 label
+using FNV-1a 64-bit. The helper returns a canonical `0x` hex seed, for example
+`0x091677a156a7756e`. Use it when the app controls the namespace, such as
+`media-cache-v1` or `upload-dedupe-v2`. If a backend or CLI must reproduce the
+same hashes, share either the derived seed value or the exact label derivation
+rule. Use HMAC or keyed BLAKE3 when authenticity matters.
 
 ## API
 
@@ -211,6 +286,7 @@ type StringHashRequest = HashRequest & {
 type HashOptions = {
   key?: string;
   keyEncoding?: 'utf8' | 'hex' | 'base64';
+  seed?: bigint | number | string;
 };
 ```
 
@@ -238,16 +314,16 @@ removed in a future major release.
 
 ## Algorithms
 
-| Algorithm                                        | Use case                                   | Notes                                                   |
-| ------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------- |
-| `SHA-256`                                        | Default general-purpose cryptographic hash | Good default for integrity checks                       |
-| `SHA-384`, `SHA-512`                             | Stronger SHA-2 variants                    | Larger output, usually slower                           |
-| `SHA-224`, `SHA-512/224`, `SHA-512/256`          | SHA-2 compatibility variants               | Useful for protocols requiring these exact digests      |
-| `MD5`, `SHA-1`                                   | Legacy compatibility                       | Do not use for new security-sensitive designs           |
-| `HMAC-SHA-256`                                   | Shared-secret authentication               | Good default HMAC choice                                |
-| `HMAC-SHA-224/384/512`, `HMAC-MD5`, `HMAC-SHA-1` | Protocol compatibility                     | Prefer SHA-256+ for new designs                         |
-| `XXH3-64`, `XXH3-128`                            | Fast non-cryptographic checksums           | Great for caching and deduplication, not authentication |
-| `BLAKE3`                                         | Modern high-performance hash               | Also supports keyed mode with a 32-byte key             |
+| Algorithm                                        | Use case                                   | Notes                                              |
+| ------------------------------------------------ | ------------------------------------------ | -------------------------------------------------- |
+| `SHA-256`                                        | Default general-purpose cryptographic hash | Good default for integrity checks                  |
+| `SHA-384`, `SHA-512`                             | Stronger SHA-2 variants                    | Larger output, usually slower                      |
+| `SHA-224`, `SHA-512/224`, `SHA-512/256`          | SHA-2 compatibility variants               | Useful for protocols requiring these exact digests |
+| `MD5`, `SHA-1`                                   | Legacy compatibility                       | Do not use for new security-sensitive designs      |
+| `HMAC-SHA-256`                                   | Shared-secret authentication               | Good default HMAC choice                           |
+| `HMAC-SHA-224/384/512`, `HMAC-MD5`, `HMAC-SHA-1` | Protocol compatibility                     | Prefer SHA-256+ for new designs                    |
+| `XXH3-64`, `XXH3-128`                            | Fast non-cryptographic checksums           | Supports optional seed; not authentication         |
+| `BLAKE3`                                         | Modern high-performance hash               | Also supports keyed mode with a 32-byte key        |
 
 ### Output Lengths
 
@@ -279,10 +355,12 @@ Common error codes:
 
 Key rules:
 
-- HMAC algorithms require `hashOptions.key`.
+- HMAC algorithms require `hashOptions.key`; pass `key: ''` explicitly for an
+  empty HMAC key.
 - `BLAKE3` uses keyed mode only when `hashOptions.key` is provided.
 - `BLAKE3` keyed mode requires a 32-byte key after decoding.
 - Other algorithms reject `hashOptions.key`.
+- `hashOptions.seed` is only valid for `XXH3-64` and `XXH3-128`.
 - `HashOptions.mode` was removed and is rejected with `E_INVALID_ARGUMENT`.
 
 ## Runtime Info
@@ -301,24 +379,6 @@ const diagnostics = await getRuntimeDiagnostics();
 
 `getRuntimeDiagnostics()` includes Zig ABI/core metadata when the Zig engine is
 selected. For the default native engine, consumers usually do not need it.
-
-## Performance
-
-Use physical devices and Release builds for performance claims. Debug,
-simulator, and emulator runs are useful for smoke checks, but they do not
-represent production throughput.
-
-Full current measurements live in [BENCHMARKS.md](./BENCHMARKS.md).
-
-Practical guidance:
-
-- Start with the default `native` engine for most apps.
-- Consider `zig` when you care about specific algorithms or want a portable
-  hashing core; check [BENCHMARKS.md](./BENCHMARKS.md) for current device data.
-- Use `SHA-256` for general integrity checks.
-- Use `XXH3-64` or `XXH3-128` for fast non-security checksums.
-- Use `HMAC-SHA-256` for shared-secret authentication.
-- Avoid `MD5` and `SHA-1` for new security-sensitive designs.
 
 ## Optional: Engine Selection
 
@@ -379,6 +439,24 @@ If `engine` is omitted, `native` is used.
 ### Engine Compatibility Notes
 
 - `XXH3-128` is currently available only in the `native` engine.
+
+## Performance
+
+Use physical devices and Release builds for performance claims. Debug,
+simulator, and emulator runs are useful for smoke checks, but they do not
+represent production throughput.
+
+Full current measurements live in [BENCHMARKS.md](./BENCHMARKS.md).
+
+Practical guidance:
+
+- Start with the default `native` engine for most apps.
+- Consider `zig` when you care about specific algorithms or want a portable
+  hashing core; check [BENCHMARKS.md](./BENCHMARKS.md) for current device data.
+- Use `SHA-256` for general integrity checks.
+- Use `XXH3-64` or `XXH3-128` for fast non-security checksums.
+- Use `HMAC-SHA-256` for shared-secret authentication.
+- Avoid `MD5` and `SHA-1` for new security-sensitive designs.
 
 ## Android 16 KB Page Size
 

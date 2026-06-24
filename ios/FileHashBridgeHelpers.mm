@@ -160,6 +160,9 @@ NSMutableDictionary *ZFHOptionsDictionaryFromCodegen(
   if (options.keyEncoding() != nil) {
     opts[@"keyEncoding"] = options.keyEncoding();
   }
+  if (options.seed() != nil) {
+    opts[@"seed"] = options.seed();
+  }
   return opts;
 }
 #endif

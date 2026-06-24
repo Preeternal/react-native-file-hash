@@ -9,6 +9,11 @@ import java.io.InputStream
 
 internal const val DEFAULT_BUFFER_SIZE = 64 * 1024
 
+internal data class HashRequestOptions(
+    val key: ByteArray? = null,
+    val seed: Long? = null
+)
+
 internal fun hmacJavaName(algo: String): String? = when (algo) {
     "HMAC-SHA-224" -> "HmacSHA224"
     "HMAC-SHA-256" -> "HmacSHA256"
@@ -21,7 +26,17 @@ internal fun hmacJavaName(algo: String): String? = when (algo) {
 
 internal fun isHmacAlgorithm(algo: String): Boolean = hmacJavaName(algo) != null
 
-internal fun validateKeyUsage(algorithm: String, key: ByteArray?) {
+private fun isXxh3Algorithm(algo: String): Boolean =
+    algo == "XXH3-64" || algo == "XXH3-128"
+
+internal fun validateHashOptionsUsage(algorithm: String, options: HashRequestOptions) {
+    val key = options.key
+    val seed = options.seed
+
+    if (seed != null && !isXxh3Algorithm(algorithm)) {
+        throw IllegalArgumentException("Seed is only used for XXH3-64 and XXH3-128")
+    }
+
     if (isHmacAlgorithm(algorithm)) {
         if (key == null) {
             throw IllegalArgumentException("Key is required for $algorithm")

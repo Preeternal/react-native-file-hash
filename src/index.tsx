@@ -1,6 +1,6 @@
 import FileHash, {
     type THashAlgorithm,
-    type HashOptions,
+    type HashOptions as NativeModuleHashOptions,
     type THashEncoding,
     type TKeyEncoding,
     type RuntimeInfo,
@@ -17,9 +17,12 @@ type HmacAlgorithm = Extract<
     | 'HMAC-SHA-1'
 >;
 
-type NativeHashOptions = {
-    key?: string;
-    keyEncoding?: TKeyEncoding;
+type NativeHashOptions = NativeModuleHashOptions;
+
+type Xxh3Seed = string | number | bigint;
+
+type HashOptions = Omit<NativeHashOptions, 'seed'> & {
+    seed?: Xxh3Seed;
 };
 
 type InvalidArgumentError = Error & { code: 'E_INVALID_ARGUMENT' };
@@ -75,11 +78,19 @@ const HMAC_ALGORITHMS: ReadonlyArray<HmacAlgorithm> = [
 ] as const;
 
 const DEFAULT_ALGORITHM: THashAlgorithm = 'SHA-256';
+const U64_MAX_HEX = '0xffffffffffffffff';
+const FNV1A64_OFFSET_BASIS_HEX = '0xcbf29ce484222325';
+const FNV1A64_PRIME_HEX = '0x100000001b3';
+const U64_HEX_PATTERN = /^0x[0-9a-f]+$/i;
+const U64_DECIMAL_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 const isHmacAlgorithm = (
     algorithm: THashAlgorithm
 ): algorithm is HmacAlgorithm =>
     (HMAC_ALGORITHMS as readonly THashAlgorithm[]).includes(algorithm);
+
+const isXxh3Algorithm = (algorithm: THashAlgorithm): boolean =>
+    algorithm === 'XXH3-64' || algorithm === 'XXH3-128';
 
 let didWarnHashStringDeprecation = false;
 let nextOperationId = 0;
@@ -118,6 +129,129 @@ const createOperationId = (): string => {
     nextOperationId += 1;
     return `file-hash:${nextOperationId}`;
 };
+
+const formatU64Hex = (value: bigint): string =>
+    `0x${value.toString(16).padStart(16, '0')}`;
+
+const getBigIntConstructor = (): BigIntConstructor => {
+    if (typeof globalThis.BigInt !== 'function') {
+        throw createInvalidArgumentError(
+            '`seed` requires a JavaScript runtime with BigInt support.'
+        );
+    }
+    return globalThis.BigInt;
+};
+
+const normalizeXxh3Seed = (seed: Xxh3Seed): string => {
+    const BigIntValue = getBigIntConstructor();
+    let value: bigint;
+
+    if (typeof seed === 'bigint') {
+        value = seed;
+    } else if (typeof seed === 'number') {
+        if (!Number.isSafeInteger(seed) || seed < 0) {
+            throw createInvalidArgumentError(
+                '`seed` number must be a non-negative safe integer. Use bigint or a decimal/0x string for full u64 seeds.'
+            );
+        }
+        value = BigIntValue(seed);
+    } else if (typeof seed === 'string') {
+        const normalized = seed.trim();
+        if (
+            !U64_HEX_PATTERN.test(normalized) &&
+            !U64_DECIMAL_PATTERN.test(normalized)
+        ) {
+            throw createInvalidArgumentError(
+                '`seed` must be a non-negative u64 as bigint, safe integer, decimal string, or 0x hex string.'
+            );
+        }
+        value = BigIntValue(normalized);
+    } else {
+        throw createInvalidArgumentError(
+            '`seed` must be a bigint, safe integer, decimal string, or 0x hex string.'
+        );
+    }
+
+    if (value < BigIntValue(0) || value > BigIntValue(U64_MAX_HEX)) {
+        throw createInvalidArgumentError(
+            '`seed` must fit into an unsigned 64-bit integer.'
+        );
+    }
+
+    return formatU64Hex(value);
+};
+
+const REPLACEMENT_CODE_POINT = 0xfffd;
+
+const utf8Bytes = (input: string): number[] => {
+    const bytes: number[] = [];
+    for (let i = 0; i < input.length; i += 1) {
+        const codeUnit = input.charCodeAt(i);
+        let codePoint = codeUnit;
+
+        if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+            const nextCodeUnit = input.charCodeAt(i + 1);
+            if (nextCodeUnit >= 0xdc00 && nextCodeUnit <= 0xdfff) {
+                codePoint =
+                    (codeUnit - 0xd800) * 0x400 +
+                    (nextCodeUnit - 0xdc00) +
+                    0x10000;
+                i += 1;
+            } else {
+                codePoint = REPLACEMENT_CODE_POINT;
+            }
+        } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+            codePoint = REPLACEMENT_CODE_POINT;
+        }
+
+        if (codePoint <= 0x7f) {
+            bytes.push(codePoint);
+        } else if (codePoint <= 0x7ff) {
+            bytes.push(
+                0xc0 + Math.floor(codePoint / 0x40),
+                0x80 + (codePoint % 0x40)
+            );
+        } else if (codePoint <= 0xffff) {
+            bytes.push(
+                0xe0 + Math.floor(codePoint / 0x1000),
+                0x80 + (Math.floor(codePoint / 0x40) % 0x40),
+                0x80 + (codePoint % 0x40)
+            );
+        } else {
+            bytes.push(
+                0xf0 + Math.floor(codePoint / 0x40000),
+                0x80 + (Math.floor(codePoint / 0x1000) % 0x40),
+                0x80 + (Math.floor(codePoint / 0x40) % 0x40),
+                0x80 + (codePoint % 0x40)
+            );
+        }
+    }
+    return bytes;
+};
+
+/**
+ * Derives a deterministic unsigned 64-bit seed from a UTF-8 label.
+ *
+ * The returned value is a canonical `0x` hex string accepted by `hashOptions.seed`.
+ * It is intended for non-cryptographic XXH3 namespaces, not secrets.
+ */
+export function xxh3SeedFromLabel(label: string): string {
+    if (typeof label !== 'string') {
+        throw createInvalidArgumentError('`label` must be a string.');
+    }
+
+    const BigIntValue = getBigIntConstructor();
+    const u64Max = BigIntValue(U64_MAX_HEX);
+    const fnvPrime = BigIntValue(FNV1A64_PRIME_HEX);
+    let hash = BigIntValue(FNV1A64_OFFSET_BASIS_HEX);
+    /* eslint-disable no-bitwise */
+    for (const byte of utf8Bytes(label)) {
+        hash ^= BigIntValue(byte);
+        hash = (hash * fnvPrime) & u64Max;
+    }
+    /* eslint-enable no-bitwise */
+    return formatU64Hex(hash);
+}
 
 const runWithAbortSignal = async <T,>(
     signal: HashAbortSignal | undefined,
@@ -183,6 +317,16 @@ const validateAndNormalizeOptions = (
     const keyEncoding: TKeyEncoding = options?.keyEncoding ?? 'utf8';
     const key = options?.key;
     const hasKey = key !== undefined;
+    const seed = options?.seed;
+    const normalizedSeed =
+        seed === undefined ? undefined : normalizeXxh3Seed(seed);
+    const hasSeed = normalizedSeed !== undefined;
+
+    if (hasSeed && !isXxh3Algorithm(algorithm)) {
+        throw createInvalidArgumentError(
+            '`seed` is only used for XXH3-64 and XXH3-128'
+        );
+    }
 
     if (isHmacAlgorithm(algorithm)) {
         if (!hasKey) {
@@ -204,6 +348,10 @@ const validateAndNormalizeOptions = (
         throw createInvalidArgumentError(
             'Key is only used for HMAC algorithms or BLAKE3'
         );
+    }
+
+    if (hasSeed) {
+        return { seed: normalizedSeed };
     }
 
     return {};
@@ -399,6 +547,7 @@ export type {
     THashEncoding,
     TKeyEncoding,
     HashOptions,
+    Xxh3Seed,
     HashAbortError,
     InvalidArgumentError,
     RuntimeInfo,

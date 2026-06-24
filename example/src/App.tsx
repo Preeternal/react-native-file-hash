@@ -5,6 +5,8 @@ import {
     getRuntimeDiagnostics,
     getRuntimeInfo,
     stringHash,
+    xxh3SeedFromLabel,
+    type HashOptions,
     type RuntimeDiagnostics,
     type RuntimeInfo,
     type THashAlgorithm,
@@ -94,9 +96,18 @@ type BenchmarkAlgorithmResult = {
     error?: string;
 };
 
+type Xxh3SeedInputMode = 'label' | 'string' | 'number' | 'bigint';
+
 const BenchmarkFile = NativeModules.BenchmarkFile as
     | BenchmarkFileModule
     | undefined;
+
+const xxh3SeedInputModes: Xxh3SeedInputMode[] = [
+    'label',
+    'string',
+    'number',
+    'bigint',
+];
 
 const formatBytes = (size?: number | null) => {
     if (!size || size <= 0) return '—';
@@ -162,6 +173,9 @@ function AppContent() {
     const [textStatus, setTextStatus] = useState<string | null>(null);
     const [key, setKey] = useState<string>('');
     const [keyEncoding, setKeyEncoding] = useState<TKeyEncoding>('utf8');
+    const [seedMode, setSeedMode] = useState<Xxh3SeedInputMode>('label');
+    const [seedLabel, setSeedLabel] = useState<string>('media-cache-v1');
+    const [seedInput, setSeedInput] = useState<string>('0x091677a156a7756e');
     const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
     const [hash, setHash] = useState<string>('');
     const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -182,19 +196,20 @@ function AppContent() {
         null
     );
     const isHmacAlgorithm = selectedAlgo.startsWith('HMAC-');
+    const isXxh3Algorithm =
+        selectedAlgo === 'XXH3-64' || selectedAlgo === 'XXH3-128';
     const fileAbortControllerRef = useRef<AbortController | null>(null);
     const textAbortControllerRef = useRef<AbortController | null>(null);
     const benchmarkAbortControllerRef = useRef<AbortController | null>(null);
     const keyPlaceholder = (() => {
         if (isHmacAlgorithm) {
-            return 'Enter HMAC key (can be empty)';
+            return 'HMAC key (empty string allowed)';
         }
         if (selectedAlgo === 'BLAKE3') {
             return 'Enter 32-byte key for keyed BLAKE3 (optional)';
         }
         return 'Leave empty: key is unsupported for this algorithm';
     })();
-
     const palette = useMemo(
         () =>
             isDarkMode
@@ -265,7 +280,68 @@ function AppContent() {
     const showZigRuntimeDetails =
         runtimeDiagnostics?.engine === 'zig' || runtimeEngine === 'zig';
 
-    const buildKeyOptions = () => {
+    const buildXxh3Seed = (): HashOptions['seed'] | undefined => {
+        const rawValue =
+            seedMode === 'label' ? seedLabel.trim() : seedInput.trim();
+
+        if (rawValue.length === 0) {
+            return undefined;
+        }
+
+        if (seedMode === 'label') {
+            return xxh3SeedFromLabel(rawValue);
+        }
+
+        if (seedMode === 'number') {
+            return Number(rawValue);
+        }
+
+        if (seedMode === 'bigint') {
+            return BigInt(rawValue);
+        }
+
+        return rawValue;
+    };
+
+    const xxh3SeedValue = (() => {
+        if (!isXxh3Algorithm) {
+            return '';
+        }
+
+        try {
+            const seed = buildXxh3Seed();
+            if (seed === undefined) {
+                return '';
+            }
+            if (typeof seed === 'bigint') {
+                return `${seed.toString()}n`;
+            }
+            return `${seed}`;
+        } catch (error: any) {
+            return error?.message ?? 'Invalid seed';
+        }
+    })();
+
+    const xxh3SeedLabel =
+        seedMode === 'label' ? 'XXH3 seed label' : 'XXH3 seed';
+    const xxh3SeedInputValue = seedMode === 'label' ? seedLabel : seedInput;
+    const xxh3SeedPlaceholder =
+        seedMode === 'label'
+            ? 'media-cache-v1'
+            : seedMode === 'number'
+              ? '12345'
+              : '0x091677a156a7756e';
+
+    const buildHashOptions = (): HashOptions | undefined => {
+        if (isXxh3Algorithm) {
+            const seed = buildXxh3Seed();
+            return seed !== undefined
+                ? {
+                      seed,
+                  }
+                : undefined;
+        }
+
         if (!isHmacAlgorithm && key.length === 0) {
             return undefined;
         }
@@ -346,7 +422,7 @@ function AppContent() {
         setHash('');
         setFileStatus('Hashing file...');
         try {
-            const options = buildKeyOptions();
+            const options = buildHashOptions();
             const start = Date.now();
             const value = await fileHash(pickedFile.uri, {
                 algorithm: selectedAlgo,
@@ -526,7 +602,7 @@ function AppContent() {
         setTextHash('');
         setTextStatus('Hashing string...');
         try {
-            const options = buildKeyOptions();
+            const options = buildHashOptions();
             const start = Date.now();
             const value = await stringHash(textInput, {
                 algorithm: selectedAlgo,
@@ -885,60 +961,163 @@ function AppContent() {
                         <Text
                             style={[styles.cardTitle, { color: palette.text }]}
                         >
-                            2. Key (for file and string)
+                            2. Options (for file and string)
                         </Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                {
-                                    color: palette.text,
-                                    borderColor: palette.border,
-                                    backgroundColor: isDarkMode
-                                        ? '#11151d'
-                                        : '#f5f7fb',
-                                },
-                            ]}
-                            placeholderTextColor={palette.muted}
-                            placeholder={keyPlaceholder}
-                            multiline
-                            value={key}
-                            onChangeText={setKey}
-                        />
-                        <View style={styles.encodingRow}>
-                            {(['utf8', 'hex', 'base64'] as TKeyEncoding[]).map(
-                                (enc) => {
-                                    const active = keyEncoding === enc;
-                                    return (
-                                        <Pressable
-                                            key={enc}
-                                            onPress={() => setKeyEncoding(enc)}
-                                            style={[
-                                                styles.chip,
-                                                {
-                                                    backgroundColor: active
-                                                        ? palette.accent
-                                                        : 'transparent',
-                                                    borderColor: palette.border,
-                                                },
-                                            ]}
-                                        >
-                                            <Text
-                                                style={{
-                                                    color: active
-                                                        ? '#0b1120'
-                                                        : palette.text,
-                                                    fontWeight: active
-                                                        ? '700'
-                                                        : '500',
-                                                }}
+                        {isXxh3Algorithm ? (
+                            <>
+                                <Text
+                                    style={[
+                                        styles.resultLabel,
+                                        { color: palette.muted },
+                                    ]}
+                                >
+                                    XXH3 seed input
+                                </Text>
+                                <View style={styles.encodingRow}>
+                                    {xxh3SeedInputModes.map((mode) => {
+                                        const active = seedMode === mode;
+                                        return (
+                                            <Pressable
+                                                key={mode}
+                                                onPress={() =>
+                                                    setSeedMode(mode)
+                                                }
+                                                style={[
+                                                    styles.chip,
+                                                    {
+                                                        backgroundColor: active
+                                                            ? palette.accent
+                                                            : 'transparent',
+                                                        borderColor:
+                                                            palette.border,
+                                                    },
+                                                ]}
                                             >
-                                                {enc.toUpperCase()}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                }
-                            )}
-                        </View>
+                                                <Text
+                                                    style={{
+                                                        color: active
+                                                            ? '#0b1120'
+                                                            : palette.text,
+                                                        fontWeight: active
+                                                            ? '700'
+                                                            : '500',
+                                                    }}
+                                                >
+                                                    {mode.toUpperCase()}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                                <Text
+                                    style={[
+                                        styles.resultLabel,
+                                        { color: palette.muted },
+                                    ]}
+                                >
+                                    {xxh3SeedLabel}
+                                </Text>
+                                <TextInput
+                                    testID="xxh3-seed-input"
+                                    style={[
+                                        styles.singleLineInput,
+                                        {
+                                            color: palette.text,
+                                            borderColor: palette.border,
+                                            backgroundColor: isDarkMode
+                                                ? '#11151d'
+                                                : '#f5f7fb',
+                                        },
+                                    ]}
+                                    placeholderTextColor={palette.muted}
+                                    placeholder={xxh3SeedPlaceholder}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    value={xxh3SeedInputValue}
+                                    onChangeText={(value) => {
+                                        if (seedMode === 'label') {
+                                            setSeedLabel(value);
+                                        } else {
+                                            setSeedInput(value);
+                                        }
+                                    }}
+                                />
+                                {xxh3SeedValue.length > 0 ? (
+                                    <Text
+                                        testID="xxh3-seed-value"
+                                        style={[
+                                            styles.optionValue,
+                                            { color: palette.muted },
+                                        ]}
+                                        selectable
+                                    >
+                                        seed: {xxh3SeedValue}
+                                    </Text>
+                                ) : null}
+                            </>
+                        ) : (
+                            <>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        {
+                                            color: palette.text,
+                                            borderColor: palette.border,
+                                            backgroundColor: isDarkMode
+                                                ? '#11151d'
+                                                : '#f5f7fb',
+                                        },
+                                    ]}
+                                    placeholderTextColor={palette.muted}
+                                    placeholder={keyPlaceholder}
+                                    multiline
+                                    value={key}
+                                    onChangeText={setKey}
+                                />
+                                <View style={styles.encodingRow}>
+                                    {(
+                                        [
+                                            'utf8',
+                                            'hex',
+                                            'base64',
+                                        ] as TKeyEncoding[]
+                                    ).map((enc) => {
+                                        const active = keyEncoding === enc;
+                                        return (
+                                            <Pressable
+                                                key={enc}
+                                                onPress={() =>
+                                                    setKeyEncoding(enc)
+                                                }
+                                                style={[
+                                                    styles.chip,
+                                                    {
+                                                        backgroundColor: active
+                                                            ? palette.accent
+                                                            : 'transparent',
+                                                        borderColor:
+                                                            palette.border,
+                                                    },
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color: active
+                                                            ? '#0b1120'
+                                                            : palette.text,
+                                                        fontWeight: active
+                                                            ? '700'
+                                                            : '500',
+                                                    }}
+                                                >
+                                                    {enc.toUpperCase()}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
                     </View>
 
                     <View
@@ -1422,6 +1601,19 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         textAlignVertical: 'top',
         marginBottom: 8,
+    },
+    singleLineInput: {
+        height: 44,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        fontSize: 15,
+        marginBottom: 8,
+    },
+    optionValue: {
+        fontSize: 12,
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+        lineHeight: 18,
     },
     runtimeBadge: {
         position: 'absolute',

@@ -8,6 +8,8 @@ Java_com_preeternal_filehash_ZigHasher_stringHash(
     jstring algorithm_j,
     jbyteArray data_j,
     jbyteArray key_j,
+    jlong seed_j,
+    jboolean has_seed_j,
     jstring operation_id_j
 ) {
     const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
@@ -22,6 +24,8 @@ Java_com_preeternal_filehash_ZigHasher_stringHash(
             data,
             key_j != nullptr,
             key,
+            has_seed_j == JNI_TRUE,
+            static_cast<uint64_t>(seed_j),
             operation_id,
             &digest
         )) {
@@ -52,6 +56,8 @@ Java_com_preeternal_filehash_ZigHasher_streamHasherCreate(
     jobject,
     jstring algorithm_j,
     jbyteArray key_j,
+    jlong seed_j,
+    jboolean has_seed_j,
     jstring operation_id_j
 ) {
     const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
@@ -64,6 +70,8 @@ Java_com_preeternal_filehash_ZigHasher_streamHasherCreate(
             algorithm,
             key_j != nullptr,
             key,
+            has_seed_j == JNI_TRUE,
+            static_cast<uint64_t>(seed_j),
             operation_id,
             &handle
         )) {

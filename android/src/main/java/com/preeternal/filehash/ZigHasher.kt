@@ -15,12 +15,16 @@ internal object ZigHasher {
         algorithm: String,
         data: ByteArray,
         key: ByteArray?,
+        seed: Long,
+        hasSeed: Boolean,
         operationId: String?
     ): ByteArray?
 
     external fun streamHasherCreate(
         algorithm: String,
         key: ByteArray?,
+        seed: Long,
+        hasSeed: Boolean,
         operationId: String?
     ): Long
 

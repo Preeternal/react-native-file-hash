@@ -23,6 +23,7 @@ export type TKeyEncoding = 'utf8' | 'hex' | 'base64';
 export type HashOptions = {
     key?: string;
     keyEncoding?: TKeyEncoding;
+    seed?: string;
 };
 export type RuntimeInfo = {
     engine: 'native' | 'zig';

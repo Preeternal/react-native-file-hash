@@ -5,22 +5,30 @@
 #include "blake3.h"
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_preeternal_filehash_NativeHasher_xxh3Init64(JNIEnv *, jobject) {
+Java_com_preeternal_filehash_NativeHasher_xxh3Init64(JNIEnv *, jobject, jlong seed, jboolean has_seed) {
     XXH3_state_t *state = XXH3_createState();
     if (state == nullptr) {
         return 0;
     }
-    XXH3_64bits_reset(state);
+    if (has_seed == JNI_TRUE) {
+        XXH3_64bits_reset_withSeed(state, static_cast<XXH64_hash_t>(seed));
+    } else {
+        XXH3_64bits_reset(state);
+    }
     return reinterpret_cast<jlong>(state);
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_preeternal_filehash_NativeHasher_xxh3Init128(JNIEnv *, jobject) {
+Java_com_preeternal_filehash_NativeHasher_xxh3Init128(JNIEnv *, jobject, jlong seed, jboolean has_seed) {
     XXH3_state_t *state = XXH3_createState();
     if (state == nullptr) {
         return 0;
     }
-    XXH3_128bits_reset(state);
+    if (has_seed == JNI_TRUE) {
+        XXH3_128bits_reset_withSeed(state, static_cast<XXH64_hash_t>(seed));
+    } else {
+        XXH3_128bits_reset(state);
+    }
     return reinterpret_cast<jlong>(state);
 }
 

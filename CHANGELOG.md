@@ -1,5 +1,82 @@
 # Releases
 
+## v2.0.6 - Seeded XXH3
+
+This release adds optional seeded `XXH3-64` / `XXH3-128` support.
+
+A seed is useful when an app needs reproducible non-cryptographic checksums
+across a backend, CLI tooling, and React Native. For example, a backend can
+publish both the expected XXH3 digest and the exact `u64` seed used to compute
+it; the mobile app can then hash the downloaded local file with the same seed
+and compare the result.
+
+Seeded XXH3 is also useful for app-owned cache or deduplication namespaces,
+such as `media-cache-v1` or `upload-dedupe-v2`, where the same bytes should
+produce stable hashes within that namespace.
+
+Seeds are not secrets and do not make XXH3 cryptographic. Use HMAC or keyed
+BLAKE3 when authenticity matters.
+
+### Added
+
+- Added `hashOptions.seed` for `XXH3-64` and `XXH3-128` in both `fileHash` and
+  `stringHash`.
+- `hashOptions.seed` accepts:
+  - `bigint`
+  - non-negative safe integer `number`
+  - decimal `string`
+  - `0x` hex `string`
+- Added `xxh3SeedFromLabel(label)` for deterministic UTF-8 label -> `u64` seed
+  derivation using FNV-1a 64-bit. It returns a canonical `0x` hex seed that can
+  be passed directly to `hashOptions.seed`.
+- Added seeded XXH3 coverage to the example app, including label, string,
+  number, and bigint seed inputs.
+- Added seeded XXH3 validation and vector tests.
+
+### Usage
+
+Pass large `u64` seeds from a backend as strings so JavaScript does not round
+them:
+
+```ts
+const manifest = {
+  xxh3Seed: '12345678901234567890',
+  xxh3: '4b5e0a417dfa7ed2fb965bc17c16bd34',
+};
+
+const actual = await fileHash(localFileUri, {
+  algorithm: 'XXH3-128',
+  hashOptions: {
+    seed: manifest.xxh3Seed,
+  },
+});
+
+if (actual !== manifest.xxh3) {
+  throw new Error('Downloaded file failed checksum verification');
+}
+```
+
+For app-owned namespaces, derive a stable seed from a readable label:
+
+```ts
+const seed = xxh3SeedFromLabel('media-cache-v1');
+
+const cacheKey = await fileHash(fileUri, {
+  algorithm: 'XXH3-128',
+  hashOptions: { seed },
+});
+```
+
+### Compatibility
+
+- `hashOptions.seed` is optional. Omit it for regular unseeded XXH3.
+- `hashOptions.seed` is only valid for `XXH3-64` and `XXH3-128`; other
+  algorithms reject it.
+- Large seeds above `Number.MAX_SAFE_INTEGER` should be passed as `bigint`,
+  decimal string, or `0x` hex string.
+- With the optional `zig` engine, seeded XXH3 currently means `XXH3-64`;
+  `XXH3-128` remains native-only.
+
 ## v2.0.5 - Zig C ABI v3, streaming files, and cancellation
 
 This release updates the Zig core to `zig-files-hash` `v0.0.5`, moves file

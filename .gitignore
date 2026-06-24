@@ -96,6 +96,7 @@ example/ios/FileHashExample.xcworkspace/xcshareddata/WorkspaceSettings.xcsetting
 
 # Local notes
 submodule-notes.md
+docs/planned-*.md
 
 # Zig prebuilt artifacts
 third_party/zig-files-hash-prebuilt/

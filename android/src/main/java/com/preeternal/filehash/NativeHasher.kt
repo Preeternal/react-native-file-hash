@@ -5,8 +5,8 @@ internal object NativeHasher {
         System.loadLibrary("filehash-native")
     }
 
-    external fun xxh3Init64(): Long
-    external fun xxh3Init128(): Long
+    external fun xxh3Init64(seed: Long, hasSeed: Boolean): Long
+    external fun xxh3Init128(seed: Long, hasSeed: Boolean): Long
     external fun xxh3Update64(statePtr: Long, data: ByteArray, length: Int)
     external fun xxh3Update128(statePtr: Long, data: ByteArray, length: Int)
     external fun xxh3Digest64(statePtr: Long): Long

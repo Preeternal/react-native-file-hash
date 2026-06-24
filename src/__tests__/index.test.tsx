@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import FileHash, { type THashAlgorithm } from '../NativeFileHash';
 import {
     fileHash,
-    hashString,
     getRuntimeDiagnostics,
     getRuntimeInfo,
     stringHash,
+    xxh3SeedFromLabel,
     type HashAbortSignal,
 } from '../index';
 
-const castAlgo = (s: string) => s as THashAlgorithm;
 const VECTORED_INPUT = 'Hello, world!';
+type Xxh3Algorithm = Extract<THashAlgorithm, 'XXH3-64' | 'XXH3-128'>;
 
 const ZIG_STRING_VECTORS: Record<string, string> = {
     'SHA-224': '8552d8b7a7dc5476cb9e25dee69a8091290764b7f2a64fe6e78e9568',
@@ -34,6 +34,28 @@ const ZIG_STRING_VECTORS: Record<string, string> = {
         '62aedf0125252922581bf109e6efc01ee2fbef97f9d60f5c065ce4a25e75273b',
 };
 
+const SEEDED_XXH3_STRING_VECTORS: Record<
+    string,
+    Record<Xxh3Algorithm, string>
+> = {
+    '0x0000000000003039': {
+        'XXH3-64': '9eb6ddb42820520d',
+        'XXH3-128': '7dacf7e6fe998719e79d5cb916f3fbf5',
+    },
+    '0x091677a156a7756e': {
+        'XXH3-64': '7442206d4f20d9c1',
+        'XXH3-128': 'a1ffe4406d215edfb11906d9c063bee0',
+    },
+    '0xab54a98ceb1f0ad2': {
+        'XXH3-64': '98a16ca0541f6ba9',
+        'XXH3-128': '4b5e0a417dfa7ed2fb965bc17c16bd34',
+    },
+    '0xffffffffffffffff': {
+        'XXH3-64': 'c6e19794c0ef3363',
+        'XXH3-128': 'b49415fb958d58817710a6ff419486d7',
+    },
+};
+
 const DEFAULT_HMAC_KEY = 'my_secret_key';
 const DEFAULT_BLAKE3_KEY =
     '3031323334353637383961626364656630313233343536373839616263646566';
@@ -47,6 +69,19 @@ const vectorForRequest = (
     algorithm: string,
     options?: Record<string, unknown>
 ) => {
+    if (
+        (algorithm === 'XXH3-64' || algorithm === 'XXH3-128') &&
+        typeof options?.seed === 'string'
+    ) {
+        const vector = SEEDED_XXH3_STRING_VECTORS[options.seed]?.[algorithm];
+        if (!vector) {
+            throw new Error(
+                `Missing seeded vector for algorithm: ${algorithm}, seed: ${options.seed}`
+            );
+        }
+        return vector;
+    }
+
     if (algorithm === 'BLAKE3' && options?.key !== undefined) {
         return ZIG_STRING_VECTORS['BLAKE3-KEYED']!;
     }
@@ -98,15 +133,18 @@ describe('fileHash options validation', () => {
     });
 
     it('requires key for HMAC algorithms', async () => {
-        await expect(fileHash('p', castAlgo('HMAC-SHA-256'))).rejects.toThrow(
-            /Key is required/
-        );
+        await expect(
+            fileHash('p', { algorithm: 'HMAC-SHA-256' })
+        ).rejects.toThrow(/Key is required/);
     });
 
     it('accepts HMAC algorithm and preserves key options', async () => {
-        await fileHash('p', castAlgo('HMAC-SHA-256'), {
-            key: 'secret',
-            keyEncoding: 'utf8',
+        await fileHash('p', {
+            algorithm: 'HMAC-SHA-256',
+            hashOptions: {
+                key: 'secret',
+                keyEncoding: 'utf8',
+            },
         });
         expect(FileHash.fileHash).toHaveBeenCalledWith(
             'p',
@@ -121,9 +159,12 @@ describe('fileHash options validation', () => {
 
     it('accepts keyed BLAKE3 with key (auto mode)', async () => {
         const hexKey = 'aa'.repeat(32);
-        await fileHash('p', castAlgo('BLAKE3'), {
-            key: hexKey,
-            keyEncoding: 'hex',
+        await fileHash('p', {
+            algorithm: 'BLAKE3',
+            hashOptions: {
+                key: hexKey,
+                keyEncoding: 'hex',
+            },
         });
         expect(FileHash.fileHash).toHaveBeenCalledWith(
             'p',
@@ -137,7 +178,7 @@ describe('fileHash options validation', () => {
     });
 
     it('accepts BLAKE3 without key (plain mode)', async () => {
-        await fileHash('p', castAlgo('BLAKE3'));
+        await fileHash('p', { algorithm: 'BLAKE3' });
         expect(FileHash.fileHash).toHaveBeenCalledWith(
             'p',
             'BLAKE3',
@@ -148,13 +189,19 @@ describe('fileHash options validation', () => {
 
     it('rejects key for non-HMAC and non-BLAKE3 algorithms', async () => {
         await expect(
-            fileHash('p', castAlgo('SHA-256'), { key: 'secret' })
+            fileHash('p', {
+                algorithm: 'SHA-256',
+                hashOptions: { key: 'secret' },
+            })
         ).rejects.toThrow(/Key is only used for HMAC algorithms or BLAKE3/);
     });
 
     it('rejects removed legacy mode option with E_INVALID_ARGUMENT', async () => {
         await expect(
-            fileHash('p', castAlgo('SHA-256'), { mode: 'hmac' } as any)
+            fileHash('p', {
+                algorithm: 'SHA-256',
+                hashOptions: { mode: 'hmac' } as any,
+            })
         ).rejects.toMatchObject({
             code: 'E_INVALID_ARGUMENT',
             message: expect.stringContaining('`mode` option was removed'),
@@ -162,7 +209,10 @@ describe('fileHash options validation', () => {
     });
 
     it('accepts empty key for HMAC (key provided)', async () => {
-        await fileHash('p', castAlgo('HMAC-SHA-256'), { key: '' });
+        await fileHash('p', {
+            algorithm: 'HMAC-SHA-256',
+            hashOptions: { key: '' },
+        });
         expect(FileHash.fileHash).toHaveBeenCalledWith(
             'p',
             'HMAC-SHA-256',
@@ -173,6 +223,94 @@ describe('fileHash options validation', () => {
             undefined
         );
     });
+
+    it('normalizes XXH3 seed options before native calls', async () => {
+        await fileHash('p', {
+            algorithm: 'XXH3-128',
+            hashOptions: {
+                seed: 12345n,
+            },
+        });
+
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'XXH3-128',
+            {
+                seed: '0x0000000000003039',
+            },
+            undefined
+        );
+    });
+
+    it('accepts decimal and 0x seed strings', async () => {
+        await fileHash('p', {
+            algorithm: 'XXH3-64',
+            hashOptions: {
+                seed: '18446744073709551615',
+            },
+        });
+        await fileHash('p', {
+            algorithm: 'XXH3-64',
+            hashOptions: {
+                seed: '0x1234',
+            },
+        });
+
+        expect(mockedFileHash.mock.calls[0]?.[2]).toEqual({
+            seed: '0xffffffffffffffff',
+        });
+        expect(mockedFileHash.mock.calls[1]?.[2]).toEqual({
+            seed: '0x0000000000001234',
+        });
+    });
+
+    it('accepts safe integer seed numbers', async () => {
+        await fileHash('p', {
+            algorithm: 'XXH3-64',
+            hashOptions: {
+                seed: 12345,
+            },
+        });
+
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'XXH3-64',
+            {
+                seed: '0x0000000000003039',
+            },
+            undefined
+        );
+    });
+
+    it('rejects seed for non-XXH3 algorithms', async () => {
+        await expect(
+            fileHash('p', {
+                algorithm: 'SHA-256',
+                hashOptions: { seed: 1 },
+            })
+        ).rejects.toThrow(/seed.*XXH3/);
+    });
+
+    it.each([
+        ['negative number', -1, /safe integer/],
+        ['unsafe number', Number.MAX_SAFE_INTEGER + 1, /safe integer/],
+        ['negative decimal string', '-1', /non-negative u64/],
+        ['invalid string', 'abc', /non-negative u64/],
+        ['decimal string above u64', '18446744073709551616', /unsigned 64-bit/],
+        ['hex string above u64', '0x10000000000000000', /unsigned 64-bit/],
+    ] as const)(
+        'rejects invalid XXH3 seed: %s',
+        async (_label, seed, error) => {
+            await expect(
+                fileHash('p', {
+                    algorithm: 'XXH3-64',
+                    hashOptions: {
+                        seed,
+                    },
+                })
+            ).rejects.toThrow(error);
+        }
+    );
 });
 
 describe('stringHash mirrors validation', () => {
@@ -193,12 +331,12 @@ describe('stringHash mirrors validation', () => {
 
     it('rejects missing key for HMAC algorithm', async () => {
         await expect(
-            stringHash('abc', castAlgo('HMAC-SHA-256'))
+            stringHash('abc', { algorithm: 'HMAC-SHA-256' })
         ).rejects.toThrow(/Key is required/);
     });
 
     it('accepts empty string input', async () => {
-        await stringHash('', castAlgo('SHA-256'));
+        await stringHash('', { algorithm: 'SHA-256' });
         expect(FileHash.stringHash).toHaveBeenCalledWith(
             '',
             'SHA-256',
@@ -210,8 +348,12 @@ describe('stringHash mirrors validation', () => {
 
     it('accepts long HMAC key without length restriction', async () => {
         const longKey = 'a'.repeat(512);
-        await stringHash('abc', castAlgo('HMAC-SHA-256'), 'utf8', {
-            key: longKey,
+        await stringHash('abc', {
+            algorithm: 'HMAC-SHA-256',
+            encoding: 'utf8',
+            hashOptions: {
+                key: longKey,
+            },
         });
         expect(FileHash.stringHash).toHaveBeenCalledWith(
             'abc',
@@ -224,13 +366,81 @@ describe('stringHash mirrors validation', () => {
 
     it('rejects removed legacy mode option with E_INVALID_ARGUMENT', async () => {
         await expect(
-            stringHash('abc', castAlgo('SHA-256'), 'utf8', {
-                mode: 'hmac',
-            } as any)
+            stringHash('abc', {
+                algorithm: 'SHA-256',
+                encoding: 'utf8',
+                hashOptions: {
+                    mode: 'hmac',
+                } as any,
+            })
         ).rejects.toMatchObject({
             code: 'E_INVALID_ARGUMENT',
             message: expect.stringContaining('`mode` option was removed'),
         });
+    });
+
+    it('passes XXH3 seed options to native stringHash', async () => {
+        await stringHash('abc', {
+            algorithm: 'XXH3-64',
+            hashOptions: {
+                seed: '0xffffffffffffffff',
+            },
+        });
+
+        expect(FileHash.stringHash).toHaveBeenCalledWith(
+            'abc',
+            'XXH3-64',
+            'utf8',
+            {
+                seed: '0xffffffffffffffff',
+            },
+            undefined
+        );
+    });
+});
+
+describe('xxh3SeedFromLabel', () => {
+    it('returns a stable canonical u64 seed', () => {
+        expect(xxh3SeedFromLabel('media-cache-v1')).toBe('0x091677a156a7756e');
+    });
+
+    it('uses UTF-8 labels', () => {
+        expect(xxh3SeedFromLabel('🔐-cache-v1')).toBe('0x269d7c32f94972b3');
+    });
+
+    it('requires BigInt only when seed features are used', async () => {
+        const descriptor = Object.getOwnPropertyDescriptor(
+            globalThis,
+            'BigInt'
+        );
+        Object.defineProperty(globalThis, 'BigInt', {
+            configurable: true,
+            value: undefined,
+        });
+
+        try {
+            await fileHash('p', { algorithm: 'SHA-256' });
+            expect(FileHash.fileHash).toHaveBeenLastCalledWith(
+                'p',
+                'SHA-256',
+                {},
+                undefined
+            );
+
+            expect(() => xxh3SeedFromLabel('media-cache-v1')).toThrow(
+                /BigInt support/
+            );
+            await expect(
+                fileHash('p', {
+                    algorithm: 'XXH3-64',
+                    hashOptions: { seed: '1' },
+                })
+            ).rejects.toThrow(/BigInt support/);
+        } finally {
+            if (descriptor) {
+                Object.defineProperty(globalThis, 'BigInt', descriptor);
+            }
+        }
     });
 });
 
@@ -251,7 +461,7 @@ describe('HashRequest object API and cancellation', () => {
 
     it('passes object-style file request hash options', async () => {
         await fileHash('p', {
-            algorithm: castAlgo('HMAC-SHA-256'),
+            algorithm: 'HMAC-SHA-256',
             hashOptions: {
                 key: 'secret',
                 keyEncoding: 'utf8',
@@ -282,7 +492,7 @@ describe('HashRequest object API and cancellation', () => {
 
     it('passes object-style string request encoding and hash options', async () => {
         await stringHash('abc', {
-            algorithm: castAlgo('HMAC-SHA-256'),
+            algorithm: 'HMAC-SHA-256',
             encoding: 'base64',
             hashOptions: {
                 key: 'secret',
@@ -347,40 +557,6 @@ describe('HashRequest object API and cancellation', () => {
     });
 });
 
-describe('hashString deprecated alias', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
-
-    it('warns once in dev mode', async () => {
-        const warnSpy = jest
-            .spyOn(console, 'warn')
-            .mockImplementation(() => undefined);
-        try {
-            await hashString('abc', castAlgo('SHA-256'));
-            await hashString('def', castAlgo('SHA-256'));
-            expect(warnSpy).toHaveBeenCalledTimes(1);
-            expect(warnSpy.mock.calls[0]?.[0]).toContain(
-                '`hashString` is deprecated'
-            );
-        } finally {
-            warnSpy.mockRestore();
-        }
-    });
-
-    it('forwards to native stringHash', async () => {
-        const digest = await hashString('abc', castAlgo('SHA-256'));
-        expect(digest).toBe('616263');
-        expect(FileHash.stringHash).toHaveBeenCalledWith(
-            'abc',
-            'SHA-256',
-            'utf8',
-            {},
-            undefined
-        );
-    });
-});
-
 describe('zig API compatibility errors', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -398,7 +574,9 @@ describe('zig API compatibility errors', () => {
             )
         );
 
-        await expect(fileHash('p', castAlgo('SHA-256'))).rejects.toMatchObject({
+        await expect(
+            fileHash('p', { algorithm: 'SHA-256' })
+        ).rejects.toMatchObject({
             code: 'E_INCOMPATIBLE_ZIG_API',
             message: expect.stringContaining('Incompatible Zig C API version'),
         });
@@ -417,7 +595,7 @@ describe('zig API compatibility errors', () => {
         );
 
         await expect(
-            stringHash('abc', castAlgo('SHA-256'))
+            stringHash('abc', { algorithm: 'SHA-256' })
         ).rejects.toMatchObject({
             code: 'E_INCOMPATIBLE_ZIG_API',
             message: expect.stringContaining('Incompatible Zig C API version'),
@@ -439,7 +617,7 @@ describe('zig vectors parity on JS boundary', () => {
     });
 
     it('returns exact zig hex vectors for plain and truncated SHA algorithms', async () => {
-        const plainAlgorithms = [
+        const plainAlgorithms: THashAlgorithm[] = [
             'SHA-224',
             'SHA-256',
             'SHA-384',
@@ -451,50 +629,99 @@ describe('zig vectors parity on JS boundary', () => {
         ];
 
         for (const algorithm of plainAlgorithms) {
-            const digest = await stringHash(
-                VECTORED_INPUT,
-                castAlgo(algorithm)
-            );
+            const digest = await stringHash(VECTORED_INPUT, {
+                algorithm,
+            });
             expect(digest).toBe(ZIG_STRING_VECTORS[algorithm]);
         }
     });
 
     it('returns exact zig hex vectors for SHA-512/224 and SHA-512/256', async () => {
-        const sha512_224 = await stringHash(
-            VECTORED_INPUT,
-            castAlgo('SHA-512/224')
-        );
+        const sha512_224 = await stringHash(VECTORED_INPUT, {
+            algorithm: 'SHA-512/224',
+        });
         expect(sha512_224).toBe(ZIG_STRING_VECTORS['SHA-512/224']);
 
-        const sha512_256 = await stringHash(
-            VECTORED_INPUT,
-            castAlgo('SHA-512/256')
-        );
+        const sha512_256 = await stringHash(VECTORED_INPUT, {
+            algorithm: 'SHA-512/256',
+        });
         expect(sha512_256).toBe(ZIG_STRING_VECTORS['SHA-512/256']);
     });
 
     it('returns exact zig hex vectors for HMAC and keyed BLAKE3', async () => {
-        const hmacDigest = await stringHash(
-            VECTORED_INPUT,
-            castAlgo('HMAC-SHA-256'),
-            'utf8',
-            {
+        const hmacDigest = await stringHash(VECTORED_INPUT, {
+            algorithm: 'HMAC-SHA-256',
+            encoding: 'utf8',
+            hashOptions: {
                 key: DEFAULT_HMAC_KEY,
                 keyEncoding: 'utf8',
-            }
-        );
+            },
+        });
         expect(hmacDigest).toBe(ZIG_STRING_VECTORS['HMAC-SHA-256']);
 
-        const keyedDigest = await stringHash(
-            VECTORED_INPUT,
-            castAlgo('BLAKE3'),
-            'utf8',
-            {
+        const keyedDigest = await stringHash(VECTORED_INPUT, {
+            algorithm: 'BLAKE3',
+            encoding: 'utf8',
+            hashOptions: {
                 key: DEFAULT_BLAKE3_KEY,
                 keyEncoding: 'hex',
-            }
-        );
+            },
+        });
         expect(keyedDigest).toBe(ZIG_STRING_VECTORS['BLAKE3-KEYED']);
+    });
+
+    it('returns exact seeded XXH3 vectors after seed normalization', async () => {
+        const cases: Array<{
+            algorithm: Xxh3Algorithm;
+            seed: string | number | bigint;
+            normalizedSeed: string;
+            digest: string;
+        }> = [
+            {
+                algorithm: 'XXH3-64',
+                seed: 12345,
+                normalizedSeed: '0x0000000000003039',
+                digest: '9eb6ddb42820520d',
+            },
+            {
+                algorithm: 'XXH3-128',
+                seed: 12345n,
+                normalizedSeed: '0x0000000000003039',
+                digest: '7dacf7e6fe998719e79d5cb916f3fbf5',
+            },
+            {
+                algorithm: 'XXH3-64',
+                seed: xxh3SeedFromLabel('media-cache-v1'),
+                normalizedSeed: '0x091677a156a7756e',
+                digest: '7442206d4f20d9c1',
+            },
+            {
+                algorithm: 'XXH3-128',
+                seed: '12345678901234567890',
+                normalizedSeed: '0xab54a98ceb1f0ad2',
+                digest: '4b5e0a417dfa7ed2fb965bc17c16bd34',
+            },
+            {
+                algorithm: 'XXH3-64',
+                seed: '0xffffffffffffffff',
+                normalizedSeed: '0xffffffffffffffff',
+                digest: 'c6e19794c0ef3363',
+            },
+        ];
+
+        for (const [index, item] of cases.entries()) {
+            const digest = await stringHash(VECTORED_INPUT, {
+                algorithm: item.algorithm,
+                hashOptions: {
+                    seed: item.seed,
+                },
+            });
+
+            expect(digest).toBe(item.digest);
+            expect(mockedStringHash.mock.calls[index]?.[3]).toEqual({
+                seed: item.normalizedSeed,
+            });
+        }
     });
 });
 

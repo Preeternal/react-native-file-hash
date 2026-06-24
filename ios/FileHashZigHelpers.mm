@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <cerrno>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -238,6 +239,42 @@ static NSData *ZFHDecodeKey(NSString *key, NSString *encoding)
   return [key dataUsingEncoding:NSUTF8StringEncoding];
 }
 
+static BOOL ZFHParseSeed(NSString *seedString, uint64_t *outSeed)
+{
+  NSString *normalized =
+      [seedString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (normalized.length == 0 || [normalized hasPrefix:@"-"] || [normalized hasPrefix:@"+"]) {
+    return NO;
+  }
+
+  int radix = 10;
+  NSString *digits = normalized;
+  if ([normalized.lowercaseString hasPrefix:@"0x"]) {
+    radix = 16;
+    digits = [normalized substringFromIndex:2];
+    if (digits.length == 0) {
+      return NO;
+    }
+  }
+
+  const char *utf8 = digits.UTF8String;
+  if (utf8 == NULL) {
+    return NO;
+  }
+
+  errno = 0;
+  char *end = NULL;
+  unsigned long long value = strtoull(utf8, &end, radix);
+  if (errno == ERANGE || end == utf8 || *end != '\0') {
+    return NO;
+  }
+
+  if (outSeed != NULL) {
+    *outSeed = (uint64_t)value;
+  }
+  return YES;
+}
+
 NSString *ZFHNormalizePath(NSString *filePath)
 {
   NSURL *url = [NSURL URLWithString:filePath];
@@ -296,9 +333,13 @@ static NSString *ZFHRNCodeForNSError(NSError *error)
   return @"E_IO_ERROR";
 }
 
-static NSString *ZFHValidateKeyUsage(zfh_algorithm algorithm, NSData *keyData)
+static NSString *ZFHValidateKeyUsage(zfh_algorithm algorithm, NSData *keyData, BOOL hasSeed)
 {
   BOOL hasKey = keyData != nil;
+  if (hasSeed && algorithm != ZFH_ALG_XXH3_64) {
+    return @"Seed is only used for XXH3-64 and XXH3-128";
+  }
+
   if (ZFHIsHmacAlgorithm(algorithm) && !hasKey) {
     return @"Key is required for HMAC algorithms";
   }
@@ -350,7 +391,25 @@ BOOL ZFHPrepareZigRequest(NSString *algorithm,
     }
   }
 
-  NSString *validationError = ZFHValidateKeyUsage(parsedAlgorithm, keyData);
+  id seedValue = options[@"seed"];
+  if (seedValue != nil && ![seedValue isKindOfClass:NSString.class]) {
+    reject(@"E_INVALID_ARGUMENT",
+           @"Seed must be a non-negative u64 decimal string or 0x hex string",
+           nil);
+    return NO;
+  }
+
+  NSString *seedString = (NSString *)seedValue;
+  BOOL hasSeed = seedString != nil;
+  uint64_t seed = 0;
+  if (hasSeed && !ZFHParseSeed(seedString, &seed)) {
+    reject(@"E_INVALID_ARGUMENT",
+           @"Seed must fit into an unsigned 64-bit integer",
+           nil);
+    return NO;
+  }
+
+  NSString *validationError = ZFHValidateKeyUsage(parsedAlgorithm, keyData, hasSeed);
   if (validationError != nil) {
     reject(@"E_INVALID_ARGUMENT", validationError, nil);
     return NO;
@@ -371,9 +430,13 @@ BOOL ZFHPrepareZigRequest(NSString *algorithm,
       optionsValueOut->key_ptr = (const uint8_t *)keyData.bytes;
       optionsValueOut->key_len = keyData.length;
     }
+    if (hasSeed) {
+      optionsValueOut->flags |= ZFH_OPTION_HAS_SEED;
+      optionsValueOut->seed = seed;
+    }
   }
   if (optionsPtrOut != NULL) {
-    *optionsPtrOut = (keyData != nil && optionsValueOut != NULL) ? optionsValueOut : NULL;
+    *optionsPtrOut = ((keyData != nil || hasSeed) && optionsValueOut != NULL) ? optionsValueOut : NULL;
   }
 
   return YES;

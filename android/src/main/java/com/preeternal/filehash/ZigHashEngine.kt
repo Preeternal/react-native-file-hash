@@ -12,12 +12,12 @@ internal class ZigHashEngine(
     override suspend fun fileHash(
         filePath: String,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String = withContext(Dispatchers.IO) {
         operation?.throwIfCancelled()
-        validateKeyUsage(algorithm, key)
-        val result = hashFileStreaming(filePath, algorithm, key, operation)
+        validateHashOptionsUsage(algorithm, options)
+        val result = hashFileStreaming(filePath, algorithm, options, operation)
         operation?.throwIfCancelled()
         return@withContext result
     }
@@ -25,13 +25,20 @@ internal class ZigHashEngine(
     override fun stringHash(
         bytes: ByteArray,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String {
         operation?.throwIfCancelled()
-        validateKeyUsage(algorithm, key)
+        validateHashOptionsUsage(algorithm, options)
         val digest =
-            ZigHasher.stringHash(algorithm, bytes, key, operation?.id)
+            ZigHasher.stringHash(
+                algorithm,
+                bytes,
+                options.key,
+                options.seed ?: 0L,
+                options.seed != null,
+                operation?.id
+            )
                 ?: throw IllegalStateException("Zig engine returned null digest")
         operation?.throwIfCancelled()
         return toHex(digest)
@@ -40,26 +47,32 @@ internal class ZigHashEngine(
     private fun hashFileStreaming(
         filePath: String,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String {
         val inputStream = openInputStream(reactContext, filePath)
         return if (operation != null) {
             operation.useCloseable(inputStream) { stream ->
-                stream.use { hashStream(it, algorithm, key, operation) }
+                stream.use { hashStream(it, algorithm, options, operation) }
             }
         } else {
-            inputStream.use { stream -> hashStream(stream, algorithm, key, null) }
+            inputStream.use { stream -> hashStream(stream, algorithm, options, null) }
         }
     }
 
     private fun hashStream(
         stream: java.io.InputStream,
         algorithm: String,
-        key: ByteArray?,
+        options: HashRequestOptions,
         operation: HashOperation?
     ): String {
-        val handle = ZigHasher.streamHasherCreate(algorithm, key, operation?.id)
+        val handle = ZigHasher.streamHasherCreate(
+            algorithm,
+            options.key,
+            options.seed ?: 0L,
+            options.seed != null,
+            operation?.id
+        )
         if (handle == 0L) {
             throw IllegalStateException("Failed to create Zig streaming hasher")
         }

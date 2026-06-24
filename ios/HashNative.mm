@@ -28,6 +28,24 @@ void *fh_xxh3_128_init(void) {
     return state;
 }
 
+void *fh_xxh3_64_init_with_seed(uint64_t seed) {
+    XXH3_state_t *state = XXH3_createState();
+    if (state == nullptr) {
+        return nullptr;
+    }
+    XXH3_64bits_reset_withSeed(state, seed);
+    return state;
+}
+
+void *fh_xxh3_128_init_with_seed(uint64_t seed) {
+    XXH3_state_t *state = XXH3_createState();
+    if (state == nullptr) {
+        return nullptr;
+    }
+    XXH3_128bits_reset_withSeed(state, seed);
+    return state;
+}
+
 void fh_xxh3_64_update(void *state, const void *data, size_t length) {
     if (state == nullptr || data == nullptr || length == 0) return;
     XXH3_64bits_update((XXH3_state_t *)state, data, length);

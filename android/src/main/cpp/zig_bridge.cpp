@@ -122,8 +122,18 @@ bool ValidateKeyUsage(
     JNIEnv *env,
     zfh_algorithm algorithm,
     bool has_key,
-    size_t key_len
+    size_t key_len,
+    bool has_seed
 ) {
+    if (has_seed && algorithm != ZFH_ALG_XXH3_64) {
+        filehash::jni::ThrowException(
+            env,
+            "java/lang/IllegalArgumentException",
+            "Seed is only used for XXH3-64 and XXH3-128"
+        );
+        return false;
+    }
+
     if (IsHmacAlgorithm(algorithm) && !has_key) {
         filehash::jni::ThrowException(
             env,
@@ -154,7 +164,12 @@ bool ValidateKeyUsage(
     return true;
 }
 
-zfh_options BuildOptions(bool has_key, const std::vector<uint8_t> &key_bytes) {
+zfh_options BuildOptions(
+    bool has_key,
+    const std::vector<uint8_t> &key_bytes,
+    bool has_seed,
+    uint64_t seed
+) {
     zfh_options options{};
     options.struct_size = ZFH_OPTIONS_STRUCT_SIZE;
     options.flags = 0;
@@ -168,6 +183,11 @@ zfh_options BuildOptions(bool has_key, const std::vector<uint8_t> &key_bytes) {
         options.key_len = key_bytes.size();
     }
 
+    if (has_seed) {
+        options.flags |= ZFH_OPTION_HAS_SEED;
+        options.seed = seed;
+    }
+
     return options;
 }
 
@@ -176,6 +196,8 @@ bool PrepareRequest(
     const std::string &algorithm_name,
     bool has_key,
     const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
     PreparedRequest *out_request
 ) {
     if (!ParseAlgorithm(algorithm_name, &out_request->algorithm)) {
@@ -187,12 +209,18 @@ bool PrepareRequest(
         return false;
     }
 
-    if (!ValidateKeyUsage(env, out_request->algorithm, has_key, key.size())) {
+    if (!ValidateKeyUsage(
+            env,
+            out_request->algorithm,
+            has_key,
+            key.size(),
+            has_seed
+        )) {
         return false;
     }
 
-    out_request->options = BuildOptions(has_key, key);
-    out_request->has_options = has_key;
+    out_request->options = BuildOptions(has_key, key, has_seed, seed);
+    out_request->has_options = has_key || has_seed;
     return true;
 }
 
@@ -383,11 +411,13 @@ bool StringHash(
     const std::vector<uint8_t> &data,
     bool has_key,
     const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
     const std::string &operation_id,
     std::vector<uint8_t> *out_digest
 ) {
     PreparedRequest request{};
-    if (!PrepareRequest(env, algorithm_name, has_key, key, &request)) {
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, &request)) {
         return false;
     }
 
@@ -435,11 +465,13 @@ bool StreamHasherCreate(
     const std::string &algorithm_name,
     bool has_key,
     const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
     const std::string &operation_id,
     jlong *out_handle
 ) {
     PreparedRequest request{};
-    if (!PrepareRequest(env, algorithm_name, has_key, key, &request)) {
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, &request)) {
         return false;
     }
 

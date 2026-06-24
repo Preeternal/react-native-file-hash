@@ -138,7 +138,7 @@ public class FileHashImpl: NSObject {
         return digest[0..<outputLength].map { String(format: "%02x", $0) }.joined()
     }
 
-    private func hashData(_ data: Data, algorithm: String) -> String? {
+    private func hashData(_ data: Data, algorithm: String, seed: UInt64?) -> String? {
         switch algorithm {
         case "MD5":
             let digest = Insecure.MD5.hash(data: data)
@@ -177,7 +177,13 @@ public class FileHashImpl: NSObject {
                 outputLength: Int(CC_SHA256_DIGEST_LENGTH)
             )
         case "XXH3-64":
-            guard let state = fh_xxh3_64_init() else { return nil }
+            let state: UnsafeMutableRawPointer?
+            if let seed {
+                state = fh_xxh3_64_init_with_seed(seed)
+            } else {
+                state = fh_xxh3_64_init()
+            }
+            guard let state else { return nil }
             defer { fh_xxh3_free(state) }
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
@@ -187,7 +193,13 @@ public class FileHashImpl: NSObject {
             let result = fh_xxh3_64_digest(state)
             return String(format: "%016llx", result)
         case "XXH3-128":
-            guard let state = fh_xxh3_128_init() else { return nil }
+            let state: UnsafeMutableRawPointer?
+            if let seed {
+                state = fh_xxh3_128_init_with_seed(seed)
+            } else {
+                state = fh_xxh3_128_init()
+            }
+            guard let state else { return nil }
             defer { fh_xxh3_free(state) }
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
@@ -421,9 +433,16 @@ public class FileHashImpl: NSObject {
 
     private func processFileXXH3_64(
         from fileHandle: FileHandle,
+        seed: UInt64?,
         operation: Operation?
     ) throws -> String {
-        guard let state = fh_xxh3_64_init() else { return "" }
+        let state: UnsafeMutableRawPointer?
+        if let seed {
+            state = fh_xxh3_64_init_with_seed(seed)
+        } else {
+            state = fh_xxh3_64_init()
+        }
+        guard let state else { return "" }
         defer { fh_xxh3_free(state) }
 
         try throwIfCancelled(operation)
@@ -450,9 +469,16 @@ public class FileHashImpl: NSObject {
 
     private func processFileXXH3_128(
         from fileHandle: FileHandle,
+        seed: UInt64?,
         operation: Operation?
     ) throws -> String {
-        guard let state = fh_xxh3_128_init() else { return "" }
+        let state: UnsafeMutableRawPointer?
+        if let seed {
+            state = fh_xxh3_128_init_with_seed(seed)
+        } else {
+            state = fh_xxh3_128_init()
+        }
+        guard let state else { return "" }
         defer { fh_xxh3_free(state) }
 
         try throwIfCancelled(operation)
@@ -537,7 +563,41 @@ public class FileHashImpl: NSObject {
         return (nil, nil)
     }
 
-    private func validateKeyUsage(algorithm: String, key: Data?) -> String? {
+    private func parseSeedOption(_ options: NSDictionary?) -> (seed: UInt64?, error: String?) {
+        guard let rawValue = options?["seed"] else {
+            return (nil, nil)
+        }
+        guard let rawSeed = rawValue as? String else {
+            return (nil, "Seed must be a non-negative u64 decimal string or 0x hex string")
+        }
+
+        let normalized = rawSeed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return (nil, "Seed must be a non-negative u64 decimal string or 0x hex string")
+        }
+
+        let digits: String
+        let radix: Int
+        if normalized.lowercased().hasPrefix("0x") {
+            digits = String(normalized.dropFirst(2))
+            radix = 16
+        } else {
+            digits = normalized
+            radix = 10
+        }
+
+        guard !digits.isEmpty, let seed = UInt64(digits, radix: radix) else {
+            return (nil, "Seed must fit into an unsigned 64-bit integer")
+        }
+
+        return (seed, nil)
+    }
+
+    private func validateKeyUsage(algorithm: String, key: Data?, seed: UInt64?) -> String? {
+        if seed != nil && algorithm != "XXH3-64" && algorithm != "XXH3-128" {
+            return "Seed is only used for XXH3-64 and XXH3-128"
+        }
+
         if isHmacAlgorithm(algorithm) {
             if key == nil {
                 return "Key is required for \(algorithm)"
@@ -575,7 +635,13 @@ public class FileHashImpl: NSObject {
                 return
             }
             let key = parsedKey.key
-            if let validationError = self.validateKeyUsage(algorithm: algorithm, key: key) {
+            let parsedSeed = self.parseSeedOption(options)
+            if let seedError = parsedSeed.error {
+                reject("E_INVALID_ARGUMENT", seedError, nil)
+                return
+            }
+            let seed = parsedSeed.seed
+            if let validationError = self.validateKeyUsage(algorithm: algorithm, key: key, seed: seed) {
                 reject("E_INVALID_ARGUMENT", validationError, nil)
                 return
             }
@@ -643,9 +709,9 @@ public class FileHashImpl: NSObject {
                             operation: operation
                         )
                     case "XXH3-64":
-                        hashString = try self.processFileXXH3_64(from: fileHandle, operation: operation)
+                        hashString = try self.processFileXXH3_64(from: fileHandle, seed: seed, operation: operation)
                     case "XXH3-128":
-                        hashString = try self.processFileXXH3_128(from: fileHandle, operation: operation)
+                        hashString = try self.processFileXXH3_128(from: fileHandle, seed: seed, operation: operation)
                     case "BLAKE3":
                         hashString = try self.processFileBLAKE3(from: fileHandle, operation: operation)
                     default:
@@ -684,7 +750,13 @@ public class FileHashImpl: NSObject {
                 return
             }
             let key = parsedKey.key
-            if let validationError = self.validateKeyUsage(algorithm: algorithm, key: key) {
+            let parsedSeed = self.parseSeedOption(options)
+            if let seedError = parsedSeed.error {
+                reject("E_INVALID_ARGUMENT", seedError, nil)
+                return
+            }
+            let seed = parsedSeed.seed
+            if let validationError = self.validateKeyUsage(algorithm: algorithm, key: key, seed: seed) {
                 reject("E_INVALID_ARGUMENT", validationError, nil)
                 return
             }
@@ -710,7 +782,7 @@ public class FileHashImpl: NSObject {
                 assert(key.count == 32, "validateKeyUsage should guarantee 32-byte key for BLAKE3 keyed mode")
                 hashString = self.hashDataKeyedBlake3(input, key: key)
             } else {
-                hashString = self.hashData(input, algorithm: algorithm)
+                hashString = self.hashData(input, algorithm: algorithm, seed: seed)
             }
 
             guard let hashString = hashString else {

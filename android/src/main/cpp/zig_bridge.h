@@ -21,6 +21,8 @@ bool StringHash(
     const std::vector<uint8_t> &data,
     bool has_key,
     const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
     const std::string &operation_id,
     std::vector<uint8_t> *out_digest
 );
@@ -30,6 +32,8 @@ bool StreamHasherCreate(
     const std::string &algorithm_name,
     bool has_key,
     const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
     const std::string &operation_id,
     jlong *out_handle
 );
