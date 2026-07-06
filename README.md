@@ -5,6 +5,10 @@ BLAKE3.
 
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
+[![iOS](https://img.shields.io/badge/iOS-stable-34C759?logo=apple&logoColor=white)](#platform-status)
+[![Android](https://img.shields.io/badge/Android-stable-3DDC84?logo=android&logoColor=white)](#platform-status)
+[![macOS](https://img.shields.io/badge/macOS-experimental-000000?logo=apple&logoColor=white)](./examples/macos)
+[![Windows](https://img.shields.io/badge/Windows-experimental-0078D4?logo=windows&logoColor=white)](./examples/windows)
 
 Use it when your app needs to verify large downloads, fingerprint media,
 deduplicate local files or cached uploads, generate fast cache keys, compare
@@ -18,7 +22,7 @@ avoid memory spikes and OOM crashes.
 ## Highlights
 
 - Streams file data from disk instead of loading the whole file into JS memory.
-- Uses native background work on iOS and Android, keeping the UI responsive.
+- Uses native background work on supported platforms, keeping the UI responsive.
 - Safe for concurrent calls: each operation owns its native hash state.
 - Defaults to `SHA-256` when you do not pass an algorithm.
 - Supports `AbortController` cancellation for long-running file hashes.
@@ -27,6 +31,20 @@ avoid memory spikes and OOM crashes.
 - Returns lowercase hex strings for every algorithm.
 - Includes native-side SHA variants, HMAC algorithms, XXH3, BLAKE3, and keyed
   BLAKE3.
+
+## Platform Status
+
+| Platform                         | Status       | Engine                              | Example / notes                          |
+| -------------------------------- | ------------ | ----------------------------------- | ---------------------------------------- |
+| iOS                              | Stable       | `native` by default, optional `zig` | [`example`](./example)                   |
+| Android                          | Stable       | `native` by default, optional `zig` | [`example`](./example)                   |
+| macOS (`react-native-macos`)     | Experimental | `zig` only                          | [`examples/macos`](./examples/macos)     |
+| Windows (`react-native-windows`) | Experimental | `zig` only                          | [`examples/windows`](./examples/windows) |
+
+Desktop support does not add `react-native-macos` or `react-native-windows` as
+root peer dependencies. Desktop examples keep their own React Native versions
+because out-of-tree desktop platforms may trail the main React Native release.
+See the macOS and Windows example READMEs for platform-specific setup notes.
 
 ## Installation
 
@@ -246,7 +264,8 @@ const mac = await fileHash(fileUri, {
 - a local path or `file://` URI;
 - an Android `content://` URI, for example from the system document picker;
 - an iOS provider-backed file URL, for example from Files or iCloud, when the
-  app has access.
+  app has access;
+- a Windows local path or `file://` URI.
 
 If `request.algorithm` is omitted, `SHA-256` is used. Use `hashOptions.key`
 only with HMAC algorithms or keyed `BLAKE3`; regular hashes reject keys.
@@ -423,6 +442,19 @@ ENV['ZFH_ENGINE'] ||= 'zig'
 ```
 
 If `ZFH_ENGINE` is omitted, `native` is used.
+
+### macOS
+
+React Native macOS support is experimental and uses the Zig engine only. There
+is no macOS native-engine switch. See [`examples/macos`](./examples/macos) for
+the isolated React Native macOS example.
+
+### Windows
+
+React Native Windows support is experimental and uses the Zig engine only.
+There is no Windows native-engine switch. See
+[`examples/windows`](./examples/windows) for the isolated React Native Windows
+example and platform-specific setup notes.
 
 ### Expo Engine Selection
 

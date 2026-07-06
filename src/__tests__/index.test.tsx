@@ -743,7 +743,7 @@ describe('runtime info', () => {
             zigApiVersion: 3,
             zigExpectedApiVersion: 3,
             zigApiCompatible: true,
-            zigVersion: 'v0.0.5',
+            zigVersion: 'v0.0.6',
         });
         expect(mockedGetRuntimeDiagnostics.mock.calls).toHaveLength(1);
     });

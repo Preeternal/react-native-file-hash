@@ -183,6 +183,12 @@ jobs:
             - name: Build Zig prebuilts for iOS
               run: ./scripts/build-zig-ios.sh
 
+            - name: Build Zig prebuilts for macOS
+              run: ./scripts/build-zig-macos.sh
+
+            - name: Build Zig prebuilts for Windows
+              run: ./scripts/build-zig-windows.sh
+
             - name: Build package
               run: yarn prepare
 

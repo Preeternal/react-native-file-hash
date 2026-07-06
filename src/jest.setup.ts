@@ -14,7 +14,7 @@ jest.mock('./NativeFileHash', () => ({
             zigApiVersion: 3,
             zigExpectedApiVersion: 3,
             zigApiCompatible: true,
-            zigVersion: 'v0.0.5',
+            zigVersion: 'v0.0.6',
         })),
     },
 }));

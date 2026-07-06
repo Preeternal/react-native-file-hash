@@ -10,6 +10,8 @@ This project is a monorepo managed using [Yarn workspaces](https://yarnpkg.com/f
 
 - The library package in the root directory.
 - An example app in the `example/` directory.
+- A separate React Native macOS example workspace in `examples/macos/`.
+- A separate React Native Windows example workspace in `examples/windows/`.
 
 To get started with the project, make sure you have the correct version of [Node.js](https://nodejs.org/) installed. See the [`.nvmrc`](./.nvmrc) file for the version used in this project.
 
@@ -35,14 +37,18 @@ If you are changing Zig engine integration and need to refresh Zig prebuilts:
 ```sh
 ./scripts/build-zig-android.sh
 ./scripts/build-zig-ios.sh
+./scripts/build-zig-macos.sh
+./scripts/build-zig-windows.sh
 ```
 
 Prebuilt output locations:
 
 - `third_party/zig-files-hash-prebuilt/android/<ABI>/libzig_files_hash.a`
 - `third_party/zig-files-hash-prebuilt/ios/ZigFilesHash.xcframework`
+- `third_party/zig-files-hash-prebuilt/macos/ZigFilesHash.xcframework`
+- `third_party/zig-files-hash-prebuilt/windows/<Platform>/zig_files_hash.lib`
 
-The bundled Zig core is `zig-files-hash v0.0.5` with C ABI v3
+The bundled Zig core is `zig-files-hash v0.0.6` with C ABI v3
 (`ZFH_API_VERSION = 3`). Custom source/prebuilt builds must use a compatible
 Zig C ABI.
 
@@ -63,6 +69,50 @@ Replace `"<IOS_DEVICE_NAME>"` with your actual iPhone device name.
 
 # 4) iOS / zig / Release / physical device
 ./scripts/build-zig-ios.sh && (cd example && ZFH_ENGINE=zig bundle exec pod install --project-directory=ios && ZFH_ENGINE=zig npx react-native run-ios --mode Release --device "<IOS_DEVICE_NAME>")
+
+# 5) macOS / zig / Debug
+./scripts/build-zig-macos.sh && yarn install && (cd examples/macos && yarn pods && yarn macos)
+
+# 6) Windows / zig / Debug
+./scripts/build-zig-windows.sh && yarn install && (cd examples/windows && yarn windows)
+```
+
+The desktop examples are Yarn workspaces, so the same commands can also be run
+from the repository root:
+
+```sh
+yarn workspace @preeternal/react-native-file-hash-macos-example pods
+yarn workspace @preeternal/react-native-file-hash-macos-example start --reset-cache
+yarn workspace @preeternal/react-native-file-hash-macos-example macos
+
+yarn workspace @preeternal/react-native-file-hash-windows-example start --reset-cache
+yarn workspace @preeternal/react-native-file-hash-windows-example windows
+```
+
+React Native Windows CLI currently requires PowerShell 7 (`pwsh.exe`) on
+`PATH`. Without it, RNW commands can fail with a misleading `unknown command`
+error instead of the real cause; see
+[microsoft/react-native-windows#16274](https://github.com/microsoft/react-native-windows/issues/16274).
+
+If the Windows example shell needs to be created or refreshed from the official
+React Native Windows template, run this from `examples/windows`:
+
+```sh
+npx react-native init-windows --overwrite
+```
+
+The command can overwrite RNW-generated files such as `windows/` and
+`metro.config.js`, so re-apply the monorepo Metro config and local app changes
+after regenerating.
+
+If RNW points you to
+`node_modules/react-native-windows/scripts/rnw-dependencies.ps1`, it is asking
+for the Windows development prerequisites. Run the dependency setup from an
+elevated PowerShell window:
+
+```powershell
+Set-ExecutionPolicy Unrestricted -Scope Process -Force
+iex (New-Object System.Net.WebClient).DownloadString('https://aka.ms/rnw-vs2022-deps.ps1')
 ```
 
 ### Local development and rebuilds

@@ -96,13 +96,16 @@ lipo -create \
 mkdir -p "${TMP_DIR}/device" "${TMP_DIR}/sim"
 cp "${TMP_DIR}/ios-arm64.a" "${TMP_DIR}/device/libzig_files_hash.a"
 cp "${TMP_DIR}/ios-sim-universal.a" "${TMP_DIR}/sim/libzig_files_hash.a"
+mkdir -p "${TMP_DIR}/headers"
+cp "${ZIG_CORE_DIR}/src/zig_files_hash_c_api.h" "${TMP_DIR}/headers/"
+cp "${ZIG_CORE_DIR}/src/zig_files_hash_c_api_generated.h" "${TMP_DIR}/headers/"
 
 echo "Creating ZigFilesHash.xcframework..."
 xcodebuild -create-xcframework \
   -library "${TMP_DIR}/device/libzig_files_hash.a" \
-  -headers "${ZIG_CORE_DIR}/src" \
+  -headers "${TMP_DIR}/headers" \
   -library "${TMP_DIR}/sim/libzig_files_hash.a" \
-  -headers "${ZIG_CORE_DIR}/src" \
+  -headers "${TMP_DIR}/headers" \
   -output "${OUT_DIR}/ZigFilesHash.xcframework"
 
 echo "Done. iOS Zig prebuilt framework is in:"
