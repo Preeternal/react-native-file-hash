@@ -5,10 +5,6 @@ BLAKE3.
 
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
-[![iOS](https://img.shields.io/badge/iOS-stable-34C759?logo=apple&logoColor=white)](#platform-status)
-[![Android](https://img.shields.io/badge/Android-stable-3DDC84?logo=android&logoColor=white)](#platform-status)
-[![macOS](https://img.shields.io/badge/macOS-experimental-000000?logo=apple&logoColor=white)](./examples/macos)
-[![Windows](https://img.shields.io/badge/Windows-experimental-0078D4?logo=windows&logoColor=white)](./examples/windows)
 
 Use it when your app needs to verify large downloads, fingerprint media,
 deduplicate local files or cached uploads, generate fast cache keys, compare
