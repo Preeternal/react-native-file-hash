@@ -21,7 +21,7 @@ type NativeHashOptions = NativeModuleHashOptions;
 
 type Xxh3Seed = string | number | bigint;
 
-type HashOptions = Omit<NativeHashOptions, 'seed'> & {
+type HashOptions = Omit<NativeHashOptions, 'seed' | 'mmap'> & {
     seed?: Xxh3Seed;
 };
 
@@ -52,9 +52,17 @@ export type HashRequest = {
     algorithm?: THashAlgorithm;
     hashOptions?: HashOptions;
     signal?: HashAbortSignal;
+    /**
+     * Zig-engine file read hint for stable regular local paths. Ignored by the
+     * default native engine and by Zig fd/stream fallback routes.
+     */
+    mmap?: boolean;
 };
 
-export type StringHashRequest = HashRequest & {
+export type StringHashRequest = {
+    algorithm?: THashAlgorithm;
+    hashOptions?: HashOptions;
+    signal?: HashAbortSignal;
     encoding?: THashEncoding;
 };
 
@@ -314,6 +322,12 @@ const validateAndNormalizeOptions = (
         );
     }
 
+    if ((options as { mmap?: unknown } | undefined)?.mmap !== undefined) {
+        throw createInvalidArgumentError(
+            '`mmap` is a fileHash request option. Pass it next to `hashOptions`, not inside `hashOptions`.'
+        );
+    }
+
     const keyEncoding: TKeyEncoding = options?.keyEncoding ?? 'utf8';
     const key = options?.key;
     const hasKey = key !== undefined;
@@ -357,6 +371,16 @@ const validateAndNormalizeOptions = (
     return {};
 };
 
+const validateAndNormalizeMmap = (
+    mmap: unknown
+): Pick<NativeHashOptions, 'mmap'> => {
+    if (mmap !== undefined && typeof mmap !== 'boolean') {
+        throw createInvalidArgumentError('`mmap` must be a boolean.');
+    }
+
+    return mmap === true ? { mmap: true } : {};
+};
+
 const normalizeRuntimeDiagnostics = (
     diagnostics: NativeRuntimeDiagnostics
 ): RuntimeDiagnostics => {
@@ -374,12 +398,13 @@ const normalizeFileHashRequest = (
     algorithmOrRequest?: THashAlgorithm | HashRequest,
     options?: HashOptions
 ): Required<Pick<HashRequest, 'algorithm'>> &
-    Pick<HashRequest, 'hashOptions' | 'signal'> => {
+    Pick<HashRequest, 'hashOptions' | 'signal' | 'mmap'> => {
     if (isRequestObject(algorithmOrRequest)) {
         return {
             algorithm: algorithmOrRequest.algorithm ?? DEFAULT_ALGORITHM,
             hashOptions: algorithmOrRequest.hashOptions,
             signal: algorithmOrRequest.signal,
+            mmap: algorithmOrRequest.mmap,
         };
     }
 
@@ -387,6 +412,7 @@ const normalizeFileHashRequest = (
         algorithm: algorithmOrRequest ?? DEFAULT_ALGORITHM,
         hashOptions: options,
         signal: undefined,
+        mmap: undefined,
     };
 };
 
@@ -398,6 +424,11 @@ const normalizeStringHashRequest = (
     Pick<StringHashRequest, 'hashOptions' | 'signal'> => {
     if (isRequestObject(algorithmOrRequest)) {
         const request = algorithmOrRequest as StringHashRequest;
+        if ((request as { mmap?: unknown }).mmap !== undefined) {
+            throw createInvalidArgumentError(
+                '`mmap` is only supported by fileHash.'
+            );
+        }
         return {
             algorithm: request.algorithm ?? DEFAULT_ALGORITHM,
             encoding: request.encoding ?? 'utf8',
@@ -407,7 +438,9 @@ const normalizeStringHashRequest = (
     }
 
     return {
-        algorithm: algorithmOrRequest ?? DEFAULT_ALGORITHM,
+        algorithm:
+            (algorithmOrRequest as THashAlgorithm | undefined) ??
+            DEFAULT_ALGORITHM,
         encoding: encoding ?? 'utf8',
         hashOptions: options,
         signal: undefined,
@@ -436,7 +469,9 @@ const nativeStringHash = (
 /**
  * Calculates the hash of a file.
  * @param filePath The path to the file.
- * @param request Request options: algorithm, hashOptions, signal.
+ * @param request Request options: algorithm, hashOptions, signal, mmap.
+ * `request.mmap` is a Zig-engine hint for stable regular local paths. It is
+ * ignored by the default native engine and by Zig fd/stream fallback routes.
  * Output format is fixed: lowercase hex string.
  * @returns A promise that resolves with a lowercase hex digest string.
  */
@@ -445,7 +480,7 @@ export function fileHash(
     request?: HashRequest
 ): Promise<string>;
 /**
- * @deprecated Use object-style request: fileHash(filePath, { algorithm, hashOptions, signal }).
+ * @deprecated Use object-style request: fileHash(filePath, { algorithm, hashOptions, signal, mmap }).
  */
 export function fileHash(
     filePath: string,
@@ -458,10 +493,10 @@ export async function fileHash(
     options?: HashOptions
 ): Promise<string> {
     const request = normalizeFileHashRequest(algorithmOrRequest, options);
-    const normalized = validateAndNormalizeOptions(
-        request.algorithm,
-        request.hashOptions
-    );
+    const normalized = {
+        ...validateAndNormalizeOptions(request.algorithm, request.hashOptions),
+        ...validateAndNormalizeMmap(request.mmap),
+    };
 
     return runWithAbortSignal(request.signal, (operationId) =>
         nativeFileHash(filePath, request.algorithm, normalized, operationId)

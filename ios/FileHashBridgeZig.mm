@@ -126,7 +126,17 @@
       if (hasUrlContext && isFileUrl) {
         streamURL = inputURL;
       } else if (!hasUrlContext) {
-        streamURL = [NSURL fileURLWithPath:normalizedPath];
+        if (operation.cancelled || ZFHIsOperationCancelled(operationId)) {
+          reject(@"E_CANCELLED", @"Hash computation cancelled", nil);
+          return;
+        }
+        (void)ZFHHashFilePathWithZigFileHash(normalizedPath,
+                                             parsedAlgorithm,
+                                             optionsPtr,
+                                             operationId,
+                                             resolve,
+                                             reject);
+        return;
       }
 
       if (streamURL != nil) {
@@ -134,12 +144,12 @@
           reject(@"E_CANCELLED", @"Hash computation cancelled", nil);
           return;
         }
-        (void)ZFHHashFileURLWithZigStreaming(streamURL,
-                                             parsedAlgorithm,
-                                             optionsPtr,
-                                             operationId,
-                                             resolve,
-                                             reject);
+        (void)ZFHHashFileURLWithZigFileHash(streamURL,
+                                            parsedAlgorithm,
+                                            optionsPtr,
+                                            operationId,
+                                            resolve,
+                                            reject);
         return;
       }
 

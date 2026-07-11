@@ -282,6 +282,33 @@ describe('fileHash options validation', () => {
         );
     });
 
+    it('passes mmap option through for fileHash', async () => {
+        await fileHash('p', {
+            algorithm: 'SHA-256',
+            mmap: true,
+        });
+
+        expect(FileHash.fileHash).toHaveBeenCalledWith(
+            'p',
+            'SHA-256',
+            {
+                mmap: true,
+            },
+            undefined
+        );
+    });
+
+    it('rejects mmap inside hashOptions', async () => {
+        await expect(
+            fileHash('p', {
+                algorithm: 'SHA-256',
+                hashOptions: {
+                    mmap: true,
+                } as any,
+            })
+        ).rejects.toThrow(/next to `hashOptions`/);
+    });
+
     it('rejects seed for non-XXH3 algorithms', async () => {
         await expect(
             fileHash('p', {
@@ -344,6 +371,15 @@ describe('stringHash mirrors validation', () => {
             {},
             undefined
         );
+    });
+
+    it('rejects mmap option for stringHash', async () => {
+        await expect(
+            stringHash('abc', {
+                algorithm: 'SHA-256',
+                mmap: true,
+            } as any)
+        ).rejects.toThrow(/`mmap` is only supported by fileHash/);
     });
 
     it('accepts long HMAC key without length restriction', async () => {
@@ -740,10 +776,10 @@ describe('runtime info', () => {
     it('returns runtime diagnostics from native module', async () => {
         await expect(getRuntimeDiagnostics()).resolves.toEqual({
             engine: 'zig',
-            zigApiVersion: 3,
-            zigExpectedApiVersion: 3,
+            zigApiVersion: 4,
+            zigExpectedApiVersion: 4,
             zigApiCompatible: true,
-            zigVersion: 'v0.0.6',
+            zigVersion: 'v0.0.7',
         });
         expect(mockedGetRuntimeDiagnostics.mock.calls).toHaveLength(1);
     });

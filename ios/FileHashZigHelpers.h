@@ -30,10 +30,17 @@ BOOL ZFHIsOperationCancelled(NSString *_Nonnull operationId);
 
 void ZFHForgetOperation(NSString *_Nonnull operationId);
 
-BOOL ZFHHashFileURLWithZigStreaming(NSURL *_Nonnull streamURL,
+BOOL ZFHHashFilePathWithZigFileHash(NSString *_Nonnull path,
                                     zfh_algorithm algorithm,
                                     const zfh_options *_Nullable optionsPtr,
                                     NSString *_Nullable operationId,
                                     RCTPromiseResolveBlock _Nonnull resolve,
                                     RCTPromiseRejectBlock _Nonnull reject);
+
+BOOL ZFHHashFileURLWithZigFileHash(NSURL *_Nonnull streamURL,
+                                   zfh_algorithm algorithm,
+                                   const zfh_options *_Nullable optionsPtr,
+                                   NSString *_Nullable operationId,
+                                   RCTPromiseResolveBlock _Nonnull resolve,
+                                   RCTPromiseRejectBlock _Nonnull reject);
 #endif

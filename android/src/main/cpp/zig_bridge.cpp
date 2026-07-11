@@ -168,7 +168,8 @@ zfh_options BuildOptions(
     bool has_key,
     const std::vector<uint8_t> &key_bytes,
     bool has_seed,
-    uint64_t seed
+    uint64_t seed,
+    bool use_mmap
 ) {
     zfh_options options{};
     options.struct_size = ZFH_OPTIONS_STRUCT_SIZE;
@@ -188,6 +189,10 @@ zfh_options BuildOptions(
         options.seed = seed;
     }
 
+    if (use_mmap) {
+        options.flags |= ZFH_OPTION_USE_MMAP;
+    }
+
     return options;
 }
 
@@ -198,6 +203,7 @@ bool PrepareRequest(
     const std::vector<uint8_t> &key,
     bool has_seed,
     uint64_t seed,
+    bool use_mmap,
     PreparedRequest *out_request
 ) {
     if (!ParseAlgorithm(algorithm_name, &out_request->algorithm)) {
@@ -219,8 +225,8 @@ bool PrepareRequest(
         return false;
     }
 
-    out_request->options = BuildOptions(has_key, key, has_seed, seed);
-    out_request->has_options = has_key || has_seed;
+    out_request->options = BuildOptions(has_key, key, has_seed, seed, use_mmap);
+    out_request->has_options = has_key || has_seed || use_mmap;
     return true;
 }
 
@@ -417,7 +423,7 @@ bool StringHash(
     std::vector<uint8_t> *out_digest
 ) {
     PreparedRequest request{};
-    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, &request)) {
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, false, &request)) {
         return false;
     }
 
@@ -460,6 +466,130 @@ bool StringHash(
     return true;
 }
 
+bool FileHashPath(
+    JNIEnv *env,
+    const std::string &path,
+    const std::string &algorithm_name,
+    bool has_key,
+    const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
+    bool use_mmap,
+    const std::string &operation_id,
+    std::vector<uint8_t> *out_digest
+) {
+    PreparedRequest request{};
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, use_mmap, &request)) {
+        return false;
+    }
+
+    ZigOperationState operation{};
+    ZigOperationState *operation_ptr = nullptr;
+    if (!operation_id.empty()) {
+        zfh_error operation_error = ZFH_OK;
+        if (!InitOperationState(&operation, &operation_error)) {
+            return ThrowForZfhError(env, operation_error, "zfh_operation_init_inplace");
+        }
+        operation_ptr = &operation;
+        RegisterOperation(operation_id, operation_ptr);
+    }
+
+    zfh_context *context = nullptr;
+    zfh_error code = zfh_context_create(&context);
+    if (code != ZFH_OK) {
+        if (operation_ptr != nullptr) {
+            UnregisterOperation(operation_id, operation_ptr);
+        }
+        return ThrowForZfhError(env, code, "zfh_context_create");
+    }
+
+    std::vector<uint8_t> digest(zfh_max_digest_length());
+    size_t written = 0;
+    const uint8_t *path_ptr =
+        path.empty() ? &filehash::jni::kEmptyByte : reinterpret_cast<const uint8_t *>(path.data());
+    zfh_request zfh_request_value = BuildZfhRequest(request, operation_ptr);
+    const zfh_request *request_ptr =
+        (request.has_options || operation_ptr != nullptr) ? &zfh_request_value : nullptr;
+
+    code = zfh_context_file_hash(
+        context,
+        request.algorithm,
+        path_ptr,
+        path.size(),
+        request_ptr,
+        digest.data(),
+        digest.size(),
+        &written
+    );
+    const zfh_error destroy_code = zfh_context_destroy(context);
+    if (operation_ptr != nullptr) {
+        UnregisterOperation(operation_id, operation_ptr);
+    }
+    if (code != ZFH_OK) {
+        return ThrowForZfhError(env, code, "zfh_context_file_hash");
+    }
+    if (destroy_code != ZFH_OK) {
+        return ThrowForZfhError(env, destroy_code, "zfh_context_destroy");
+    }
+
+    digest.resize(written);
+    *out_digest = std::move(digest);
+    return true;
+}
+
+bool FileHashFd(
+    JNIEnv *env,
+    int fd,
+    const std::string &algorithm_name,
+    bool has_key,
+    const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
+    const std::string &operation_id,
+    std::vector<uint8_t> *out_digest
+) {
+    PreparedRequest request{};
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, false, &request)) {
+        return false;
+    }
+
+    ZigOperationState operation{};
+    ZigOperationState *operation_ptr = nullptr;
+    if (!operation_id.empty()) {
+        zfh_error operation_error = ZFH_OK;
+        if (!InitOperationState(&operation, &operation_error)) {
+            return ThrowForZfhError(env, operation_error, "zfh_operation_init_inplace");
+        }
+        operation_ptr = &operation;
+        RegisterOperation(operation_id, operation_ptr);
+    }
+
+    std::vector<uint8_t> digest(zfh_max_digest_length());
+    size_t written = 0;
+    zfh_request zfh_request_value = BuildZfhRequest(request, operation_ptr);
+    const zfh_request *request_ptr =
+        (request.has_options || operation_ptr != nullptr) ? &zfh_request_value : nullptr;
+
+    const zfh_error code = zfh_fd_hash(
+        request.algorithm,
+        fd,
+        request_ptr,
+        digest.data(),
+        digest.size(),
+        &written
+    );
+    if (operation_ptr != nullptr) {
+        UnregisterOperation(operation_id, operation_ptr);
+    }
+    if (code != ZFH_OK) {
+        return ThrowForZfhError(env, code, "zfh_fd_hash");
+    }
+
+    digest.resize(written);
+    *out_digest = std::move(digest);
+    return true;
+}
+
 bool StreamHasherCreate(
     JNIEnv *env,
     const std::string &algorithm_name,
@@ -471,7 +601,7 @@ bool StreamHasherCreate(
     jlong *out_handle
 ) {
     PreparedRequest request{};
-    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, &request)) {
+    if (!PrepareRequest(env, algorithm_name, has_key, key, has_seed, seed, false, &request)) {
         return false;
     }
 

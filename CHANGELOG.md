@@ -1,5 +1,29 @@
 # Releases
 
+## v2.0.8 - Zig fd/path hashing and mmap request hint
+
+### Added
+
+- Added `HashRequest.mmap` as an opt-in file hashing hint for stable regular
+  local files. The option maps to Zig C ABI v4 `ZFH_OPTION_USE_MMAP`, is a
+  no-op in the default `native` engine, is ignored for Zig
+  descriptor/stream-backed sources, and is rejected by `stringHash`.
+
+### Changed
+
+- Updated the bundled Zig core integration to `zig-files-hash` `v0.0.7` / C ABI
+  v4.
+- The Zig Android engine now hashes local paths through `zfh_context_file_hash`
+  and Android `content://` descriptors through `zfh_fd_hash`, keeping the read
+  loop inside Zig when a path or fd is available. The default `native` Android
+  engine still uses platform stream/file-handle hashing.
+- The Zig iOS/macOS bridge now uses `zfh_context_file_hash` for local paths and
+  tries coordinated path/fd hashing for file URLs before falling back to
+  `NSInputStream` streaming. The default iOS `native` engine still uses the
+  platform file-handle implementation.
+
+---
+
 ## v2.0.7 - Desktop support and leaner npm package
 
 This release line starts desktop support for React Native out-of-tree

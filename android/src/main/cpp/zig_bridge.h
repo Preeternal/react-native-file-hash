@@ -27,6 +27,31 @@ bool StringHash(
     std::vector<uint8_t> *out_digest
 );
 
+bool FileHashPath(
+    JNIEnv *env,
+    const std::string &path,
+    const std::string &algorithm_name,
+    bool has_key,
+    const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
+    bool use_mmap,
+    const std::string &operation_id,
+    std::vector<uint8_t> *out_digest
+);
+
+bool FileHashFd(
+    JNIEnv *env,
+    int fd,
+    const std::string &algorithm_name,
+    bool has_key,
+    const std::vector<uint8_t> &key,
+    bool has_seed,
+    uint64_t seed,
+    const std::string &operation_id,
+    std::vector<uint8_t> *out_digest
+);
+
 bool StreamHasherCreate(
     JNIEnv *env,
     const std::string &algorithm_name,

@@ -24,6 +24,7 @@ export type HashOptions = {
     key?: string;
     keyEncoding?: TKeyEncoding;
     seed?: string;
+    mmap?: boolean;
 };
 export type RuntimeInfo = {
     engine: 'native' | 'zig';

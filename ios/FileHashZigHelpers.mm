@@ -4,9 +4,12 @@
 #include <vector>
 #include <cstdint>
 #include <cerrno>
+#include <cstring>
 #include <cstdlib>
+#include <fcntl.h>
 #include <mutex>
 #include <string>
+#include <unistd.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -107,6 +110,75 @@ struct ZFHOperationGuard {
     }
   }
 };
+
+static const zfh_request *ZFHBuildRequest(const zfh_options *optionsPtr,
+                                          ZFHOperationStateStorage *operation,
+                                          zfh_request *request)
+{
+  request->struct_size = ZFH_REQUEST_STRUCT_SIZE;
+  request->options_ptr = optionsPtr;
+  if (operation != nullptr) {
+    request->operation_ptr = operation->statePtr;
+    request->operation_len = operation->stateLen;
+  }
+  return (optionsPtr != NULL || operation != nullptr) ? request : NULL;
+}
+
+static zfh_error ZFHRunPathHash(NSString *path,
+                                zfh_algorithm algorithm,
+                                const zfh_options *optionsPtr,
+                                ZFHOperationStateStorage *operation,
+                                std::vector<uint8_t> *out,
+                                size_t *written)
+{
+  const char *pathUtf8 = path.UTF8String;
+  if (pathUtf8 == NULL) {
+    return ZFH_INVALID_PATH;
+  }
+
+  zfh_context *context = NULL;
+  zfh_error err = zfh_context_create(&context);
+  if (err != ZFH_OK) {
+    return err;
+  }
+
+  zfh_request request = {};
+  const zfh_request *requestPtr = ZFHBuildRequest(optionsPtr, operation, &request);
+  out->assign(zfh_max_digest_length(), 0);
+  *written = 0;
+  err = zfh_context_file_hash(context,
+                              algorithm,
+                              reinterpret_cast<const uint8_t *>(pathUtf8),
+                              strlen(pathUtf8),
+                              requestPtr,
+                              out->data(),
+                              out->size(),
+                              written);
+  zfh_error destroyErr = zfh_context_destroy(context);
+  if (err != ZFH_OK) {
+    return err;
+  }
+  return destroyErr;
+}
+
+static zfh_error ZFHRunFdHash(int fd,
+                              zfh_algorithm algorithm,
+                              const zfh_options *optionsPtr,
+                              ZFHOperationStateStorage *operation,
+                              std::vector<uint8_t> *out,
+                              size_t *written)
+{
+  zfh_request request = {};
+  const zfh_request *requestPtr = ZFHBuildRequest(optionsPtr, operation, &request);
+  out->assign(zfh_max_digest_length(), 0);
+  *written = 0;
+  return zfh_fd_hash(algorithm,
+                     fd,
+                     requestPtr,
+                     out->data(),
+                     out->size(),
+                     written);
+}
 
 static BOOL ZFHParseAlgorithm(NSString *algorithm, zfh_algorithm *out)
 {
@@ -333,6 +405,20 @@ static NSString *ZFHRNCodeForNSError(NSError *error)
   return @"E_IO_ERROR";
 }
 
+static BOOL ZFHShouldTryURLStreamFallback(zfh_error err)
+{
+  switch (err) {
+    case ZFH_FILE_NOT_FOUND:
+    case ZFH_ACCESS_DENIED:
+    case ZFH_INVALID_PATH:
+    case ZFH_IO_ERROR:
+    case ZFH_UNKNOWN_ERROR:
+      return YES;
+    default:
+      return NO;
+  }
+}
+
 static NSString *ZFHValidateKeyUsage(zfh_algorithm algorithm, NSData *keyData, BOOL hasSeed)
 {
   BOOL hasKey = keyData != nil;
@@ -409,6 +495,13 @@ BOOL ZFHPrepareZigRequest(NSString *algorithm,
     return NO;
   }
 
+  id mmapValue = options[@"mmap"];
+  if (mmapValue != nil && ![mmapValue isKindOfClass:NSNumber.class]) {
+    reject(@"E_INVALID_ARGUMENT", @"mmap must be a boolean", nil);
+    return NO;
+  }
+  BOOL mmap = mmapValue != nil ? [(NSNumber *)mmapValue boolValue] : NO;
+
   NSString *validationError = ZFHValidateKeyUsage(parsedAlgorithm, keyData, hasSeed);
   if (validationError != nil) {
     reject(@"E_INVALID_ARGUMENT", validationError, nil);
@@ -434,9 +527,13 @@ BOOL ZFHPrepareZigRequest(NSString *algorithm,
       optionsValueOut->flags |= ZFH_OPTION_HAS_SEED;
       optionsValueOut->seed = seed;
     }
+    if (mmap) {
+      optionsValueOut->flags |= ZFH_OPTION_USE_MMAP;
+    }
   }
   if (optionsPtrOut != NULL) {
-    *optionsPtrOut = ((keyData != nil || hasSeed) && optionsValueOut != NULL) ? optionsValueOut : NULL;
+    *optionsPtrOut =
+        ((keyData != nil || hasSeed || mmap) && optionsValueOut != NULL) ? optionsValueOut : NULL;
   }
 
   return YES;
@@ -509,12 +606,56 @@ void ZFHForgetOperation(NSString *operationId)
   }
 }
 
-BOOL ZFHHashFileURLWithZigStreaming(NSURL *streamURL,
+BOOL ZFHHashFilePathWithZigFileHash(NSString *path,
                                     zfh_algorithm algorithm,
                                     const zfh_options *optionsPtr,
                                     NSString *operationId,
                                     RCTPromiseResolveBlock resolve,
                                     RCTPromiseRejectBlock reject)
+{
+  if (path.length == 0) {
+    reject(@"E_INVALID_PATH", @"Invalid file path", nil);
+    return NO;
+  }
+
+  ZFHOperationStateStorage operationStorage;
+  ZFHOperationGuard operationGuard;
+  const std::string operationIdString = ZFHOperationIdString(operationId);
+  if (!operationIdString.empty()) {
+    zfh_error operationErr = ZFHInitOperationState(&operationStorage);
+    if (operationErr != ZFH_OK) {
+      ZFHRejectZigError(operationErr, reject);
+      return NO;
+    }
+    ZFHRegisterOperation(operationIdString, &operationStorage);
+    operationGuard.operationId = operationIdString;
+    operationGuard.operation = &operationStorage;
+    operationGuard.registered = true;
+  }
+
+  std::vector<uint8_t> out;
+  size_t written = 0;
+  zfh_error err = ZFHRunPathHash(path,
+                                 algorithm,
+                                 optionsPtr,
+                                 operationGuard.registered ? &operationStorage : nullptr,
+                                 &out,
+                                 &written);
+  if (err != ZFH_OK) {
+    ZFHRejectZigError(err, reject);
+    return NO;
+  }
+
+  resolve(ZFHHexString(out.data(), written));
+  return YES;
+}
+
+BOOL ZFHHashFileURLWithZigFileHash(NSURL *streamURL,
+                                   zfh_algorithm algorithm,
+                                   const zfh_options *optionsPtr,
+                                   NSString *operationId,
+                                   RCTPromiseResolveBlock resolve,
+                                   RCTPromiseRejectBlock reject)
 {
   if (streamURL == nil) {
     reject(@"E_INVALID_PATH", @"Invalid URL for streaming fallback", nil);
@@ -630,10 +771,59 @@ BOOL ZFHHashFileURLWithZigStreaming(NSURL *streamURL,
 
   NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
   NSError *coordinationError = nil;
+  ZFHOperationStateStorage *operationPtr =
+      operationGuard.registered ? &operationStorage : nullptr;
   [coordinator coordinateReadingItemAtURL:streamURL
                                   options:NSFileCoordinatorReadingWithoutChanges
                                     error:&coordinationError
                                byAccessor:^(NSURL *_Nonnull coordinatedURL) {
+    NSString *coordinatedPath = coordinatedURL.path;
+    if (coordinatedPath.length > 0) {
+      std::vector<uint8_t> directOut;
+      size_t directWritten = 0;
+      zfh_error directError = ZFHRunPathHash(coordinatedPath,
+                                             algorithm,
+                                             optionsPtr,
+                                             operationPtr,
+                                             &directOut,
+                                             &directWritten);
+      if (directError == ZFH_OK) {
+        hexResult = ZFHHexString(directOut.data(), directWritten);
+        return;
+      }
+      if (!ZFHShouldTryURLStreamFallback(directError)) {
+        hashingError = directError;
+        return;
+      }
+
+      const char *fileSystemPath = coordinatedPath.fileSystemRepresentation;
+      if (fileSystemPath != NULL) {
+        int fd = open(fileSystemPath, O_RDONLY);
+        if (fd >= 0) {
+          std::vector<uint8_t> fdOut;
+          size_t fdWritten = 0;
+          zfh_error fdError = ZFHRunFdHash(fd,
+                                           algorithm,
+                                           optionsPtr,
+                                           operationPtr,
+                                           &fdOut,
+                                           &fdWritten);
+          int closeResult = close(fd);
+          if (fdError == ZFH_OK && closeResult != 0) {
+            fdError = ZFH_IO_ERROR;
+          }
+          if (fdError == ZFH_OK) {
+            hexResult = ZFHHexString(fdOut.data(), fdWritten);
+            return;
+          }
+          if (!ZFHShouldTryURLStreamFallback(fdError)) {
+            hashingError = fdError;
+            return;
+          }
+        }
+      }
+    }
+
     NSInputStream *stream = [NSInputStream inputStreamWithURL:coordinatedURL];
     if (stream == nil) {
       customErrorCode = @"E_INVALID_PATH";

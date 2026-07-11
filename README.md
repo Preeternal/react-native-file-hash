@@ -298,7 +298,10 @@ type HashRequest = {
   signal?: HashAbortSignal;
 };
 
-type StringHashRequest = HashRequest & {
+type StringHashRequest = {
+  algorithm?: THashAlgorithm;
+  hashOptions?: HashOptions;
+  signal?: HashAbortSignal;
   encoding?: 'utf8' | 'base64';
 };
 
@@ -412,6 +415,32 @@ XXH3. The `zig` engine can be useful when you want one portable hashing core
 shared across bindings, when you want to validate behavior against the Zig
 implementation, or when current benchmarks favor Zig for the algorithms you
 use. See [BENCHMARKS.md](./BENCHMARKS.md) for the latest engine comparison.
+
+### Zig File Routing
+
+When possible, the Zig engine hashes files through a path or file descriptor in
+one native call, reducing data transfer across the JSI/native boundary.
+
+`HashRequest.mmap` provides opt-in mmap I/O for stable regular local files when
+the Zig engine uses the path fast path. It defaults to `false`. Set it only for
+a stable, non-empty regular local file after benchmarking your workload. It is
+an I/O optimization: the digest does not change.
+
+```ts
+const digest = await fileHash('/path/to/stable-large-file.bin', {
+  algorithm: 'SHA-256',
+  mmap: true,
+});
+```
+
+The option applies only to regular local paths / `file://` URLs. It is ignored
+for Android `content://` descriptors, Apple coordinated file/provider descriptor
+or stream fallback routes, and Windows. Windows currently accepts the option for
+API compatibility but does not support mmap in this package.
+
+Do not enable `mmap` while another process can truncate or modify the file. On
+iOS, macOS, and Android, a mapped file may fault if the underlying file changes;
+that can terminate the process with `SIGBUS`.
 
 Package users do not need a local Zig toolchain; release artifacts include Zig
 prebuilts.

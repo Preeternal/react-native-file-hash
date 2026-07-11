@@ -235,6 +235,7 @@ function App() {
     const [fileElapsedMs, setFileElapsedMs] = useState<number | null>(null);
     const [fileStatus, setFileStatus] = useState('');
     const [fileLoading, setFileLoading] = useState(false);
+    const [mmapEnabled, setMmapEnabled] = useState(false);
     const [benchmarkSizeMb, setBenchmarkSizeMb] = useState('200');
     const [benchmarkSamples, setBenchmarkSamples] = useState('3');
     const [benchmarkWarmups, setBenchmarkWarmups] = useState('1');
@@ -395,6 +396,7 @@ function App() {
             const digest = await fileHash(uri, {
                 algorithm: selectedAlgo,
                 hashOptions: buildHashOptions(),
+                mmap: mmapEnabled,
                 signal: controller.signal,
             });
             setFileDigest(digest);
@@ -491,6 +493,7 @@ function App() {
                         const digest = await fileHash(filePath, {
                             algorithm,
                             hashOptions: buildBenchmarkKeyOptions(algorithm),
+                            mmap: mmapEnabled,
                             signal: controller.signal,
                         });
                         const elapsed = Date.now() - start;
@@ -534,6 +537,7 @@ function App() {
                 sizeMiB: sizeMb,
                 samples,
                 warmups,
+                mmap: mmapEnabled,
                 algorithms: benchmarkAlgorithms,
                 results,
                 createdAt: new Date().toISOString(),
@@ -928,6 +932,37 @@ function App() {
                         />
                     </>
                 ) : null}
+                <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: mmapEnabled }}
+                    style={styles.checkboxRow}
+                    onPress={() => setMmapEnabled((value) => !value)}
+                >
+                    <View
+                        style={[
+                            styles.checkboxBox,
+                            {
+                                borderColor: mmapEnabled
+                                    ? palette.accent
+                                    : palette.border,
+                            },
+                        ]}
+                    >
+                        {mmapEnabled ? (
+                            <View
+                                style={[
+                                    styles.checkboxCheck,
+                                    { borderColor: palette.accent },
+                                ]}
+                            />
+                        ) : null}
+                    </View>
+                    <Text
+                        style={[styles.checkboxLabel, { color: palette.text }]}
+                    >
+                        mmap
+                    </Text>
+                </Pressable>
             </View>
 
             <View
@@ -1197,6 +1232,31 @@ const styles = StyleSheet.create({
     },
     chipText: {
         fontSize: 13,
+        fontWeight: '700',
+    },
+    checkboxRow: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+    },
+    checkboxBox: {
+        alignItems: 'center',
+        borderRadius: 4,
+        borderWidth: 1.5,
+        height: 20,
+        justifyContent: 'center',
+        width: 20,
+    },
+    checkboxCheck: {
+        borderBottomWidth: 2,
+        borderRightWidth: 2,
+        height: 10,
+        marginTop: -2,
+        transform: [{ rotate: '45deg' }],
+        width: 5,
+    },
+    checkboxLabel: {
+        fontSize: 14,
         fontWeight: '700',
     },
     button: {

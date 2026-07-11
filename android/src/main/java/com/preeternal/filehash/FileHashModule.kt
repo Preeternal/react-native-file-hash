@@ -406,10 +406,21 @@ class FileHashModule(
         return if (keyString != null) decodeKey(keyString, keyEncoding) else null
     }
 
+    private fun parseMmapOption(options: ReadableMap?): Boolean {
+        if (options == null || !options.hasKey("mmap") || options.isNull("mmap")) {
+            return false
+        }
+        require(options.getType("mmap") == ReadableType.Boolean) {
+            "mmap must be a boolean"
+        }
+        return options.getBoolean("mmap")
+    }
+
     private fun parseHashOptions(options: ReadableMap?): HashRequestOptions =
         HashRequestOptions(
             key = parseKeyOption(options),
-            seed = parseSeedOption(options)
+            seed = parseSeedOption(options),
+            mmap = parseMmapOption(options)
         )
 
     companion object {

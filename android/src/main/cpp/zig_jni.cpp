@@ -40,6 +40,75 @@ Java_com_preeternal_filehash_ZigHasher_apiVersion(JNIEnv *, jobject) {
     return filehash::zig::ApiVersion();
 }
 
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_preeternal_filehash_ZigHasher_fileHashPath(
+    JNIEnv *env,
+    jobject,
+    jstring path_j,
+    jstring algorithm_j,
+    jbyteArray key_j,
+    jlong seed_j,
+    jboolean has_seed_j,
+    jboolean mmap_j,
+    jstring operation_id_j
+) {
+    const std::string path = filehash::jni::JStringToUtf8(env, path_j);
+    const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
+    const std::vector<uint8_t> key = filehash::jni::JByteArrayToVector(env, key_j);
+    const std::string operation_id = filehash::jni::JStringToUtf8(env, operation_id_j);
+    std::vector<uint8_t> digest;
+
+    if (!filehash::zig::FileHashPath(
+            env,
+            path,
+            algorithm,
+            key_j != nullptr,
+            key,
+            has_seed_j == JNI_TRUE,
+            static_cast<uint64_t>(seed_j),
+            mmap_j == JNI_TRUE,
+            operation_id,
+            &digest
+        )) {
+        return nullptr;
+    }
+
+    return filehash::jni::MakeJavaByteArray(env, digest.data(), digest.size());
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_preeternal_filehash_ZigHasher_fileHashFd(
+    JNIEnv *env,
+    jobject,
+    jint fd_j,
+    jstring algorithm_j,
+    jbyteArray key_j,
+    jlong seed_j,
+    jboolean has_seed_j,
+    jstring operation_id_j
+) {
+    const std::string algorithm = filehash::jni::JStringToUtf8(env, algorithm_j);
+    const std::vector<uint8_t> key = filehash::jni::JByteArrayToVector(env, key_j);
+    const std::string operation_id = filehash::jni::JStringToUtf8(env, operation_id_j);
+    std::vector<uint8_t> digest;
+
+    if (!filehash::zig::FileHashFd(
+            env,
+            static_cast<int>(fd_j),
+            algorithm,
+            key_j != nullptr,
+            key,
+            has_seed_j == JNI_TRUE,
+            static_cast<uint64_t>(seed_j),
+            operation_id,
+            &digest
+        )) {
+        return nullptr;
+    }
+
+    return filehash::jni::MakeJavaByteArray(env, digest.data(), digest.size());
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_preeternal_filehash_ZigHasher_expectedApiVersion(JNIEnv *, jobject) {
     return filehash::zig::ExpectedApiVersion();

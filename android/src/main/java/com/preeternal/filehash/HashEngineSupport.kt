@@ -11,7 +11,8 @@ internal const val DEFAULT_BUFFER_SIZE = 64 * 1024
 
 internal data class HashRequestOptions(
     val key: ByteArray? = null,
-    val seed: Long? = null
+    val seed: Long? = null,
+    val mmap: Boolean = false
 )
 
 internal fun hmacJavaName(algo: String): String? = when (algo) {

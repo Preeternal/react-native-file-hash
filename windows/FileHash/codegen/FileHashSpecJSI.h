@@ -17,13 +17,14 @@ namespace facebook::react {
 
 #pragma mark - NativeFileHashHashOptions
 
-template <typename P0, typename P1, typename P2>
+template <typename P0, typename P1, typename P2, typename P3>
 struct NativeFileHashHashOptions {
   P0 key{};
   P1 keyEncoding{};
-  P2 seed;
+  P2 seed{};
+  P3 mmap;
   bool operator==(const NativeFileHashHashOptions &other) const {
-    return key == other.key && keyEncoding == other.keyEncoding && seed == other.seed;
+    return key == other.key && keyEncoding == other.keyEncoding && seed == other.seed && mmap == other.mmap;
   }
 };
 
@@ -38,7 +39,8 @@ struct NativeFileHashHashOptionsBridging {
     T result{
       bridging::fromJs<decltype(types.key)>(rt, value.getProperty(rt, "key"), jsInvoker),
       bridging::fromJs<decltype(types.keyEncoding)>(rt, value.getProperty(rt, "keyEncoding"), jsInvoker),
-      bridging::fromJs<decltype(types.seed)>(rt, value.getProperty(rt, "seed"), jsInvoker)};
+      bridging::fromJs<decltype(types.seed)>(rt, value.getProperty(rt, "seed"), jsInvoker),
+      bridging::fromJs<decltype(types.mmap)>(rt, value.getProperty(rt, "mmap"), jsInvoker)};
     return result;
   }
 
@@ -50,6 +52,9 @@ struct NativeFileHashHashOptionsBridging {
     return bridging::toJs(rt, value);
   }
   static jsi::String seedToJs(jsi::Runtime &rt, decltype(types.seed) value) {
+    return bridging::toJs(rt, value);
+  }
+  static bool mmapToJs(jsi::Runtime &rt, decltype(types.mmap) value) {
     return bridging::toJs(rt, value);
   }
 #endif
@@ -67,6 +72,9 @@ struct NativeFileHashHashOptionsBridging {
     }
     if (value.seed) {
       result.setProperty(rt, "seed", bridging::toJs(rt, value.seed.value(), jsInvoker));
+    }
+    if (value.mmap) {
+      result.setProperty(rt, "mmap", bridging::toJs(rt, value.mmap.value(), jsInvoker));
     }
     return result;
   }

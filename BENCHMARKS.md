@@ -35,6 +35,8 @@ against physical devices.
   `HMAC-SHA-224`, `HMAC-SHA-256`, `BLAKE3`, and `XXH3-64`.
 - Current iOS `native` remains the better choice for `SHA-1` and the `SHA-384` /
   `SHA-512` family.
+- Zig `mmap` remains opt-in because measurements vary by workload; benchmark
+  the target device, file size, storage, and algorithm before enabling it.
 - Android `zig` is close to `native` for `SHA-224`, `SHA-256`,
   `HMAC-SHA-224`, and `HMAC-SHA-256` because the shipped Zig runtime routes
   those algorithms through the native fallback.
@@ -124,24 +126,34 @@ against physical devices.
 
 ## Full Matrix: Desktop Zig 200 MiB
 
-| Algorithm    | macOS M4 Max | macOS range | Windows ARM64 VM | Windows range |
-| ------------ | -----------: | ----------: | ---------------: | ------------: |
-| SHA-256      |         79.0 |   79.0-79.0 |              539 |       516-636 |
-| MD5          |          238 |     238-239 |              285 |       269-289 |
-| SHA-1        |          171 |     169-171 |              201 |       198-205 |
-| SHA-224      |         79.0 |   78.0-79.0 |              496 |       496-504 |
-| SHA-384      |          295 |     293-295 |              335 |       333-362 |
-| SHA-512      |          295 |     293-296 |              332 |       331-337 |
-| SHA-512/224  |          296 |     295-296 |              347 |       329-365 |
-| SHA-512/256  |          296 |     295-297 |              349 |       340-525 |
-| HMAC-SHA-224 |         78.0 |   78.0-79.0 |              502 |       493-515 |
-| HMAC-SHA-256 |         78.0 |   78.0-78.0 |              505 |       503-508 |
-| HMAC-SHA-384 |          297 |     293-299 |              349 |       340-374 |
-| HMAC-SHA-512 |          297 |     295-298 |              338 |       332-339 |
-| HMAC-MD5     |          239 |     238-246 |              269 |       266-269 |
-| HMAC-SHA-1   |          172 |     172-172 |              202 |       200-203 |
-| BLAKE3       |          102 |     102-103 |              125 |       125-126 |
-| XXH3-64      |         14.0 |   14.0-15.0 |             28.0 |     28.0-30.0 |
+| Algorithm    | macOS M4 Max | macOS range | macOS mmap | macOS mmap range | mmap vs macOS Zig | Windows ARM64 VM | Windows range |
+| ------------ | -----------: | ----------: | ---------: | ---------------: | ----------------: | ---------------: | ------------: |
+| SHA-256      |         79.0 |   79.0-79.0 |       75.0 |        75.0-75.0 |         5% faster |              539 |       516-636 |
+| MD5          |          238 |     238-239 |        237 |          234-238 |              flat |              285 |       269-289 |
+| SHA-1        |          171 |     169-171 |        165 |          165-166 |         4% faster |              201 |       198-205 |
+| SHA-224      |         79.0 |   78.0-79.0 |       74.0 |        74.0-75.0 |         6% faster |              496 |       496-504 |
+| SHA-384      |          295 |     293-295 |        287 |          284-293 |         3% faster |              335 |       333-362 |
+| SHA-512      |          295 |     293-296 |        274 |          273-277 |         7% faster |              332 |       331-337 |
+| SHA-512/224  |          296 |     295-296 |        283 |          282-285 |         4% faster |              347 |       329-365 |
+| SHA-512/256  |          296 |     295-297 |        284 |          284-285 |         4% faster |              349 |       340-525 |
+| HMAC-SHA-224 |         78.0 |   78.0-79.0 |       74.0 |        74.0-75.0 |         5% faster |              502 |       493-515 |
+| HMAC-SHA-256 |         78.0 |   78.0-78.0 |       74.0 |        74.0-75.0 |         5% faster |              505 |       503-508 |
+| HMAC-SHA-384 |          297 |     293-299 |        284 |          282-286 |         4% faster |              349 |       340-374 |
+| HMAC-SHA-512 |          297 |     295-298 |        282 |          280-283 |         5% faster |              338 |       332-339 |
+| HMAC-MD5     |          239 |     238-246 |        234 |          234-235 |         2% faster |              269 |       266-269 |
+| HMAC-SHA-1   |          172 |     172-172 |        166 |          166-167 |         3% faster |              202 |       200-203 |
+| BLAKE3       |          102 |     102-103 |        102 |          102-103 |              flat |              125 |       125-126 |
+| XXH3-64      |         14.0 |   14.0-15.0 |       15.0 |        15.0-15.0 |         7% slower |             28.0 |     28.0-30.0 |
+
+## mmap observations (zig engine only)
+
+Local mmap measurements varied by workload. In separate 200 MiB release-build
+client comparisons, results ranged from mixed low-single-digit changes to all
+recorded medians being roughly 2-11% faster. Direct Zig-core measurements on a
+500 MiB file showed up to roughly 20% improvement for some algorithms.
+
+mmap remains disabled by default; benchmark the target device, file size,
+storage, and algorithm before enabling it.
 
 ## Notes
 

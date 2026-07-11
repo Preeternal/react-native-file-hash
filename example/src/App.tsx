@@ -22,6 +22,7 @@ import {
 import {
     ActivityIndicator,
     Alert,
+    Clipboard,
     KeyboardAvoidingView,
     NativeModules,
     Platform,
@@ -161,6 +162,16 @@ const buildBenchmarkKeyOptions = (algorithm: THashAlgorithm) =>
           }
         : undefined;
 
+const formatBenchmarkResult = (result: BenchmarkAlgorithmResult) => {
+    if (result.error) {
+        return `${result.algorithm}: ${result.error}`;
+    }
+
+    return `${result.algorithm}: ${formatMs(result.medianMs)} median (${formatMs(
+        result.minMs
+    )}-${formatMs(result.maxMs)}) ${result.digestPrefix ?? ''}`;
+};
+
 function AppContent() {
     const isDarkMode = useColorScheme() === 'dark';
     const insets = useSafeAreaInsets();
@@ -181,11 +192,15 @@ function AppContent() {
     const [elapsedMs, setElapsedMs] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [fileStatus, setFileStatus] = useState<string | null>(null);
+    const [mmapEnabled, setMmapEnabled] = useState(false);
     const [benchmarkSizeMb, setBenchmarkSizeMb] = useState('200');
     const [benchmarkSamples, setBenchmarkSamples] = useState('3');
     const [benchmarkWarmups, setBenchmarkWarmups] = useState('1');
     const [benchmarkRunning, setBenchmarkRunning] = useState(false);
     const [benchmarkStatus, setBenchmarkStatus] = useState<string | null>(null);
+    const [benchmarkCopyStatus, setBenchmarkCopyStatus] = useState<
+        string | null
+    >(null);
     const [benchmarkResults, setBenchmarkResults] = useState<
         BenchmarkAlgorithmResult[]
     >([]);
@@ -279,6 +294,10 @@ function AppContent() {
             : 'n/a';
     const showZigRuntimeDetails =
         runtimeDiagnostics?.engine === 'zig' || runtimeEngine === 'zig';
+    const benchmarkResultsText = useMemo(
+        () => benchmarkResults.map(formatBenchmarkResult).join('\n'),
+        [benchmarkResults]
+    );
 
     const buildXxh3Seed = (): HashOptions['seed'] | undefined => {
         const rawValue =
@@ -422,11 +441,11 @@ function AppContent() {
         setHash('');
         setFileStatus('Hashing file...');
         try {
-            const options = buildHashOptions();
             const start = Date.now();
             const value = await fileHash(pickedFile.uri, {
                 algorithm: selectedAlgo,
-                hashOptions: options,
+                hashOptions: buildHashOptions(),
+                mmap: mmapEnabled,
                 signal: controller.signal,
             });
 
@@ -478,6 +497,7 @@ function AppContent() {
         benchmarkAbortControllerRef.current = controller;
         setBenchmarkRunning(true);
         setBenchmarkResults([]);
+        setBenchmarkCopyStatus(null);
         setBenchmarkStatus(`Preparing ${sizeMb} MiB file...`);
 
         try {
@@ -510,6 +530,7 @@ function AppContent() {
                         const digest = await fileHash(filePath, {
                             algorithm,
                             hashOptions: buildBenchmarkKeyOptions(algorithm),
+                            mmap: mmapEnabled,
                             signal: controller.signal,
                         });
                         const elapsed = nowMs() - start;
@@ -553,6 +574,7 @@ function AppContent() {
                 sizeMiB: sizeMb,
                 samples,
                 warmups,
+                mmap: mmapEnabled,
                 algorithms: benchmarkAlgorithms,
                 results,
                 createdAt: new Date().toISOString(),
@@ -588,6 +610,21 @@ function AppContent() {
 
         setBenchmarkStatus('Cancelling benchmark...');
         controller.abort();
+    };
+
+    const copyBenchmarkResults = async () => {
+        if (benchmarkResultsText.length === 0) {
+            return;
+        }
+
+        try {
+            Clipboard.setString(benchmarkResultsText);
+            setBenchmarkCopyStatus('Copied');
+        } catch (error: any) {
+            const message = error?.message ?? 'Copy failed';
+            setBenchmarkCopyStatus(message);
+            Alert.alert('Copy failed', message);
+        }
     };
 
     const handleHashString = async () => {
@@ -883,19 +920,70 @@ function AppContent() {
                                 testID="benchmark-results"
                                 style={styles.resultBox}
                             >
-                                {benchmarkResults.map((result) => (
-                                    <Text
-                                        key={result.algorithm}
-                                        style={[
-                                            styles.resultText,
-                                            { color: palette.text },
-                                        ]}
-                                    >
-                                        {result.algorithm}:{' '}
-                                        {result.error ??
-                                            formatMs(result.medianMs)}
-                                    </Text>
-                                ))}
+                                {benchmarkStatus === 'Benchmark complete' ? (
+                                    <View style={styles.resultBoxActions}>
+                                        {benchmarkCopyStatus ? (
+                                            <Text
+                                                numberOfLines={1}
+                                                style={[
+                                                    styles.copyStatus,
+                                                    { color: palette.muted },
+                                                ]}
+                                            >
+                                                {benchmarkCopyStatus}
+                                            </Text>
+                                        ) : null}
+                                        <Pressable
+                                            accessibilityLabel="Copy benchmark results"
+                                            accessibilityRole="button"
+                                            hitSlop={8}
+                                            style={[
+                                                styles.copyIconButton,
+                                                {
+                                                    borderColor: palette.border,
+                                                    backgroundColor: isDarkMode
+                                                        ? '#171a20cc'
+                                                        : '#ffffffcc',
+                                                },
+                                            ]}
+                                            onPress={copyBenchmarkResults}
+                                        >
+                                            <View style={styles.copyIcon}>
+                                                <View
+                                                    style={[
+                                                        styles.copyIconBack,
+                                                        {
+                                                            borderColor:
+                                                                palette.muted,
+                                                        },
+                                                    ]}
+                                                />
+                                                <View
+                                                    style={[
+                                                        styles.copyIconFront,
+                                                        {
+                                                            borderColor:
+                                                                palette.muted,
+                                                            backgroundColor:
+                                                                isDarkMode
+                                                                    ? '#171a20cc'
+                                                                    : '#ffffffcc',
+                                                        },
+                                                    ]}
+                                                />
+                                            </View>
+                                        </Pressable>
+                                    </View>
+                                ) : null}
+                                <Text
+                                    selectable
+                                    style={[
+                                        styles.resultText,
+                                        { color: palette.text },
+                                    ]}
+                                >
+                                    {benchmarkResultsText}
+                                </Text>
                             </View>
                         ) : null}
                     </View>
@@ -961,7 +1049,7 @@ function AppContent() {
                         <Text
                             style={[styles.cardTitle, { color: palette.text }]}
                         >
-                            2. Options (for file and string)
+                            2. Options
                         </Text>
                         {isXxh3Algorithm ? (
                             <>
@@ -1118,6 +1206,38 @@ function AppContent() {
                                 </View>
                             </>
                         )}
+                        <Pressable
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: mmapEnabled }}
+                            style={styles.checkboxRow}
+                            onPress={() => setMmapEnabled((value) => !value)}
+                        >
+                            <View
+                                style={[
+                                    styles.checkboxBox,
+                                    {
+                                        borderColor: mmapEnabled
+                                            ? palette.accent
+                                            : palette.border,
+                                        backgroundColor: mmapEnabled
+                                            ? palette.accent
+                                            : 'transparent',
+                                    },
+                                ]}
+                            >
+                                {mmapEnabled ? (
+                                    <View style={styles.checkboxCheck} />
+                                ) : null}
+                            </View>
+                            <Text
+                                style={[
+                                    styles.checkboxLabel,
+                                    { color: palette.text },
+                                ]}
+                            >
+                                mmap
+                            </Text>
+                        </Pressable>
                     </View>
 
                     <View
@@ -1571,10 +1691,55 @@ const styles = StyleSheet.create({
     resultBox: {
         marginTop: 12,
         padding: 12,
+        position: 'relative',
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#e5e7eb33',
         backgroundColor: '#00000008',
+    },
+    resultBoxActions: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 8,
+        position: 'absolute',
+        right: 12,
+        top: 12,
+        zIndex: 1,
+    },
+    copyStatus: {
+        fontSize: 12,
+        maxWidth: 120,
+    },
+    copyIconButton: {
+        alignItems: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+        height: 36,
+        justifyContent: 'center',
+        width: 36,
+    },
+    copyIcon: {
+        height: 18,
+        position: 'relative',
+        width: 18,
+    },
+    copyIconBack: {
+        borderRadius: 3,
+        borderWidth: 1.5,
+        height: 11,
+        left: 2,
+        position: 'absolute',
+        top: 2,
+        width: 11,
+    },
+    copyIconFront: {
+        borderRadius: 3,
+        borderWidth: 1.5,
+        height: 11,
+        left: 6,
+        position: 'absolute',
+        top: 6,
+        width: 11,
     },
     resultLabel: {
         fontSize: 12,
@@ -1614,6 +1779,33 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
         lineHeight: 18,
+    },
+    checkboxRow: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 8,
+    },
+    checkboxBox: {
+        alignItems: 'center',
+        borderRadius: 5,
+        borderWidth: 1.5,
+        height: 22,
+        justifyContent: 'center',
+        width: 22,
+    },
+    checkboxCheck: {
+        borderBottomWidth: 2,
+        borderColor: '#0b1120',
+        borderRightWidth: 2,
+        height: 11,
+        marginTop: -2,
+        transform: [{ rotate: '45deg' }],
+        width: 6,
+    },
+    checkboxLabel: {
+        fontSize: 14,
+        fontWeight: '700',
     },
     runtimeBadge: {
         position: 'absolute',

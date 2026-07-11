@@ -18,6 +18,7 @@ struct FileHashSpec_HashOptions {
     std::optional<std::string> key;
     std::optional<std::string> keyEncoding;
     std::optional<std::string> seed;
+    std::optional<bool> mmap;
 };
 
 struct FileHashSpec_RuntimeDiagnostics {
@@ -38,6 +39,7 @@ inline winrt::Microsoft::ReactNative::FieldMap GetStructInfo(FileHashSpec_HashOp
         {L"key", &FileHashSpec_HashOptions::key},
         {L"keyEncoding", &FileHashSpec_HashOptions::keyEncoding},
         {L"seed", &FileHashSpec_HashOptions::seed},
+        {L"mmap", &FileHashSpec_HashOptions::mmap},
     };
     return fieldMap;
 }

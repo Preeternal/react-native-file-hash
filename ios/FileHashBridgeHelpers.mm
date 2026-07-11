@@ -163,6 +163,10 @@ NSMutableDictionary *ZFHOptionsDictionaryFromCodegen(
   if (options.seed() != nil) {
     opts[@"seed"] = options.seed();
   }
+  std::optional<bool> mmap = options.mmap();
+  if (mmap.has_value()) {
+    opts[@"mmap"] = @(*mmap);
+  }
   return opts;
 }
 #endif

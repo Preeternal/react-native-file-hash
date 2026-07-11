@@ -11,10 +11,10 @@ jest.mock('./NativeFileHash', () => ({
         })),
         getRuntimeDiagnostics: jest.fn(async () => ({
             engine: 'zig',
-            zigApiVersion: 3,
-            zigExpectedApiVersion: 3,
+            zigApiVersion: 4,
+            zigExpectedApiVersion: 4,
             zigApiCompatible: true,
-            zigVersion: 'v0.0.6',
+            zigVersion: 'v0.0.7',
         })),
     },
 }));

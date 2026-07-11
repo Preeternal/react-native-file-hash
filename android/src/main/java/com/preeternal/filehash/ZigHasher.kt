@@ -20,6 +20,25 @@ internal object ZigHasher {
         operationId: String?
     ): ByteArray?
 
+    external fun fileHashPath(
+        path: String,
+        algorithm: String,
+        key: ByteArray?,
+        seed: Long,
+        hasSeed: Boolean,
+        mmap: Boolean,
+        operationId: String?
+    ): ByteArray?
+
+    external fun fileHashFd(
+        fd: Int,
+        algorithm: String,
+        key: ByteArray?,
+        seed: Long,
+        hasSeed: Boolean,
+        operationId: String?
+    ): ByteArray?
+
     external fun streamHasherCreate(
         algorithm: String,
         key: ByteArray?,
