@@ -165,7 +165,7 @@
         "examples/macos",
         "examples/windows"
     ],
-    "packageManager": "yarn@4.12.0",
+    "packageManager": "yarn@4.18.0",
     "react-native-builder-bob": {
         "source": "src",
         "output": "lib",
