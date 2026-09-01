@@ -1,9 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <React/RCTBridgeModule.h>
 
-#if RCT_NEW_ARCH_ENABLED
 #import <FileHashSpec/FileHashSpec.h>
-#endif
 
 FOUNDATION_EXPORT NSString * _Nonnull const ZFHErrorHashFailed;
 FOUNDATION_EXPORT NSString * _Nonnull const ZFHErrorUnsupportedEngine;
@@ -20,7 +18,5 @@ BOOL ZFHResolveRuntimeDiagnostics(
 
 BOOL ZFHEnsureZigApiCompatibility(RCTPromiseRejectBlock _Nonnull reject);
 
-#if RCT_NEW_ARCH_ENABLED
 NSMutableDictionary *_Nonnull ZFHOptionsDictionaryFromCodegen(
     JS::NativeFileHash::HashOptions &options);
-#endif

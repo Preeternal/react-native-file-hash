@@ -6,6 +6,10 @@ BLAKE3.
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 
+> Starting with `v3.0.0`, this package supports only React Native's New
+> Architecture. Projects that still require the legacy bridge should stay on
+> `v2.x`.
+
 Use it when your app needs to verify large downloads, fingerprint media,
 deduplicate local files or cached uploads, generate fast cache keys, compare
 local content, or authenticate data with HMAC or keyed BLAKE3.
@@ -60,7 +64,7 @@ or:
 bun add @preeternal/react-native-file-hash
 ```
 
-React Native 0.60+ autolinks the native module.
+React Native autolinks the native module.
 
 For iOS, install pods:
 

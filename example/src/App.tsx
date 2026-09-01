@@ -100,8 +100,7 @@ type BenchmarkAlgorithmResult = {
 type Xxh3SeedInputMode = 'label' | 'string' | 'number' | 'bigint';
 
 const BenchmarkFile = NativeModules.BenchmarkFile as
-    | BenchmarkFileModule
-    | undefined;
+    BenchmarkFileModule | undefined;
 
 const xxh3SeedInputModes: Xxh3SeedInputMode[] = [
     'label',

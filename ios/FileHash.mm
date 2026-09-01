@@ -18,8 +18,6 @@
 #endif
 }
 
-RCT_EXPORT_MODULE();
-
 - (instancetype)init
 {
   if (self = [super init]) {
@@ -31,11 +29,6 @@ RCT_EXPORT_MODULE();
 #endif
   }
   return self;
-}
-
-+ (BOOL)requiresMainQueueSetup
-{
-  return NO;
 }
 
 #pragma mark - Runtime Info
@@ -141,10 +134,8 @@ RCT_EXPORT_MODULE();
 
 #pragma mark - TurboModule Bridge
 
-#if RCT_NEW_ARCH_ENABLED
-
-// New architecture: codegen passes HashOptions as a C++ wrapper around NSDictionary.
-// Convert to a plain NSDictionary before forwarding to Swift implementation.
+// Codegen passes HashOptions as a C++ wrapper around NSDictionary.
+// Convert it to a plain NSDictionary before forwarding to the selected engine.
 - (void)fileHash:(NSString *)filePath
        algorithm:(NSString *)algorithm
          options:(JS::NativeFileHash::HashOptions &)options
@@ -219,63 +210,10 @@ RCT_EXPORT_MODULE();
   return std::make_shared<facebook::react::NativeFileHashSpecJSI>(params);
 }
 
-#else
-
-RCT_EXPORT_METHOD(fileHash
-                  : (NSString *)filePath algorithm
-                  : (NSString *)algorithm options
-                  : (NSDictionary *)options operationId
-                  : (NSString *)operationId resolve
-                  : (RCTPromiseResolveBlock)resolve reject
-                  : (RCTPromiseRejectBlock)reject)
++ (NSString *)moduleName
 {
-  [self dispatchFileHashRequest:filePath
-                      algorithm:algorithm
-                        options:options
-                    operationId:operationId
-                        resolve:resolve
-                         reject:reject];
+  return @"FileHash";
 }
-
-RCT_EXPORT_METHOD(stringHash
-                  : (NSString *)text algorithm
-                  : (NSString *)algorithm encoding
-                  : (NSString *)encoding options
-                  : (NSDictionary *)options operationId
-                  : (NSString *)operationId resolve
-                  : (RCTPromiseResolveBlock)resolve reject
-                  : (RCTPromiseRejectBlock)reject)
-{
-  [self dispatchStringHashRequest:text
-                        algorithm:algorithm
-                         encoding:encoding
-                          options:options
-                      operationId:operationId
-                          resolve:resolve
-                           reject:reject];
-}
-
-RCT_EXPORT_METHOD(cancelOperation
-                  : (NSString *)operationId)
-{
-  [self cancelOperation:operationId];
-}
-
-RCT_EXPORT_METHOD(getRuntimeInfo
-                  : (RCTPromiseResolveBlock)resolve reject
-                  : (RCTPromiseRejectBlock)reject)
-{
-  [self getRuntimeInfoWithResolve:resolve reject:reject];
-}
-
-RCT_EXPORT_METHOD(getRuntimeDiagnostics
-                  : (RCTPromiseResolveBlock)resolve reject
-                  : (RCTPromiseRejectBlock)reject)
-{
-  [self getRuntimeDiagnosticsWithResolve:resolve reject:reject];
-}
-
-#endif
 
 - (void)invalidate
 {

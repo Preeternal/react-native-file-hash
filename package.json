@@ -6,7 +6,7 @@
     "types": "./lib/typescript/src/index.d.ts",
     "exports": {
         ".": {
-            "source": "./src/index.tsx",
+            "preeternal-react-native-file-hash-source": "./src/index.tsx",
             "types": "./lib/typescript/src/index.d.ts",
             "default": "./lib/module/index.js"
         },
@@ -130,31 +130,31 @@
         ]
     },
     "devDependencies": {
-        "@commitlint/config-conventional": "^20.5.0",
-        "@eslint/compat": "^2.0.3",
+        "@commitlint/config-conventional": "^21.0.2",
+        "@eslint/compat": "^2.1.0",
         "@eslint/eslintrc": "^3.3.5",
         "@eslint/js": "^10.0.1",
-        "@jest/globals": "^30.0.0",
+        "@jest/globals": "^29.7.0",
         "@react-native/babel-preset": "0.85.0",
         "@react-native/eslint-config": "0.85.0",
         "@react-native/jest-preset": "0.85.0",
-        "@release-it/conventional-changelog": "^10.0.6",
+        "@release-it/conventional-changelog": "^11.0.1",
         "@types/react": "^19.2.0",
-        "commitlint": "^20.5.0",
+        "commitlint": "^21.0.2",
         "del-cli": "^7.0.0",
         "eslint": "^9.39.4",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-ft-flow": "^3.0.11",
-        "eslint-plugin-prettier": "^5.5.5",
-        "jest": "^30.3.0",
-        "lefthook": "^2.1.4",
-        "prettier": "^3.8.1",
+        "eslint-plugin-prettier": "^5.5.6",
+        "jest": "^29.7.0",
+        "lefthook": "^2.1.9",
+        "prettier": "^3.8.3",
         "react": "19.2.3",
         "react-native": "0.85.0",
-        "react-native-builder-bob": "^0.41.0",
-        "release-it": "^19.2.4",
-        "turbo": "^2.8.21",
-        "typescript": "^6.0.2"
+        "react-native-builder-bob": "^0.43.0",
+        "release-it": "^20.2.0",
+        "turbo": "^2.9.16",
+        "typescript": "^6.0.3"
     },
     "peerDependencies": {
         "react": "*",
@@ -216,6 +216,13 @@
         "setupFilesAfterEnv": [
             "<rootDir>/src/jest.setup.ts"
         ],
+        "testEnvironmentOptions": {
+            "customExportConditions": [
+                "require",
+                "react-native",
+                "preeternal-react-native-file-hash-source"
+            ]
+        },
         "modulePathIgnorePatterns": [
             "<rootDir>/example/node_modules",
             "<rootDir>/lib/"
@@ -254,6 +261,6 @@
             "lefthook",
             "release-it"
         ],
-        "version": "0.62.0"
+        "version": "0.63.0"
     }
 }

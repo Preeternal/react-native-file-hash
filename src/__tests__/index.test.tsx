@@ -327,7 +327,7 @@ describe('fileHash options validation', () => {
         ['hex string above u64', '0x10000000000000000', /unsigned 64-bit/],
     ] as const)(
         'rejects invalid XXH3 seed: %s',
-        async (_label, seed, error) => {
+        async (...[_label, seed, error]) => {
             await expect(
                 fileHash('p', {
                     algorithm: 'XXH3-64',
@@ -562,8 +562,7 @@ describe('HashRequest object API and cancellation', () => {
     it('cancels native operation when signal aborts during file hash', async () => {
         const controller = createMockAbortController();
         let rejectNative:
-            | ((error: Error & { code: string }) => void)
-            | undefined;
+            ((error: Error & { code: string }) => void) | undefined;
         mockedFileHash.mockImplementationOnce(
             async () =>
                 new Promise<string>((_resolve, reject) => {

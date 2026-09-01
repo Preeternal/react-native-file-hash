@@ -54,8 +54,7 @@ type Xxh3SeedInputMode = 'label' | 'string' | 'number' | 'bigint';
 
 const MacFilePicker = NativeModules.MacFilePicker as MacFilePickerModule;
 const BenchmarkFile = NativeModules.BenchmarkFile as
-    | BenchmarkFileModule
-    | undefined;
+    BenchmarkFileModule | undefined;
 
 const algorithms: THashAlgorithm[] = [
     'MD5',

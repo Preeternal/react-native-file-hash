@@ -36,6 +36,7 @@ zig_source_files = [
 ]
 
 zig_private_header_files = [
+  "ios/FileHash.h",
   "ios/FileHashBridgeHelpers.h",
   "ios/FileHashBridgeZig.h",
   "ios/FileHashZigHelpers.h"
@@ -116,25 +117,22 @@ Pod::Spec.new do |s|
   }
 
   s.osx.source_files = zig_source_files
-  s.osx.public_header_files = [
-    "ios/FileHash.h"
-  ]
   s.osx.private_header_files = zig_private_header_files
   s.osx.vendored_frameworks = zig_macos_xcframework
 
   if is_zig
     s.ios.source_files = zig_source_files
-    s.ios.public_header_files = [
-      "ios/FileHash.h"
-    ]
     s.ios.private_header_files = zig_private_header_files
     s.ios.vendored_frameworks = zig_ios_xcframework
   else
     s.ios.source_files = native_source_files
+    # FileHash.h imports the C++ codegen spec and must not be pulled into the
+    # Swift module. FileHash.swift only needs this C API from HashNative.h.
     s.ios.public_header_files = [
-      "ios/FileHash.h"
+      "ios/HashNative.h"
     ]
     s.ios.private_header_files = [
+      "ios/FileHash.h",
       "ios/FileHashBridgeNative.h",
       "ios/FileHashBridgeHelpers.h",
       "third_party/**/*.h"

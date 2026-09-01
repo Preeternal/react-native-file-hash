@@ -149,7 +149,6 @@ BOOL ZFHEnsureZigApiCompatibility(RCTPromiseRejectBlock reject)
 #endif
 }
 
-#if RCT_NEW_ARCH_ENABLED
 NSMutableDictionary *ZFHOptionsDictionaryFromCodegen(
     JS::NativeFileHash::HashOptions &options)
 {
@@ -169,4 +168,3 @@ NSMutableDictionary *ZFHOptionsDictionaryFromCodegen(
   }
   return opts;
 }
-#endif

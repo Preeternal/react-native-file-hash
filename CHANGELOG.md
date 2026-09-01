@@ -1,5 +1,23 @@
 # Releases
 
+## v3.0.0 - New Architecture only
+
+### Breaking changes
+
+- Removed React Native Old Architecture support. `@preeternal/react-native-file-hash`
+  now requires the New Architecture and its TurboModule/codegen integration.
+
+### Changed
+
+- Updated the project to the `create-react-native-library` `0.63.0` template
+  baseline and refreshed its development toolchain.
+- iOS now registers `FileHash` only through the generated TurboModule spec;
+  the legacy `RCTBridgeModule` and `RCT_EXPORT_METHOD` implementation was
+  removed.
+- Android now relies solely on the generated `NativeFileHashSpec` methods.
+
+---
+
 ## v2.0.8 - Zig fd/path hashing and mmap request hint
 
 ### Added

@@ -45,8 +45,7 @@ type BenchmarkAlgorithmResult = {
 };
 
 const BenchmarkFile = NativeModules.BenchmarkFile as
-    | BenchmarkFileModule
-    | undefined;
+    BenchmarkFileModule | undefined;
 
 const algorithms: THashAlgorithm[] = [
     'MD5',
