@@ -1,7 +1,7 @@
 #import "FileHash.h"
 #import "FileHashBridgeHelpers.h"
 
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
 #import "FileHashBridgeNative.h"
 #endif
 
@@ -10,7 +10,7 @@
 #endif
 
 @implementation FileHash {
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   FileHashBridgeNative *_nativeBridge;
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -21,7 +21,7 @@
 - (instancetype)init
 {
   if (self = [super init]) {
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
     _nativeBridge = [FileHashBridgeNative new];
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -33,8 +33,8 @@
 
 #pragma mark - Runtime Info
 
-- (void)getRuntimeInfoWithResolve:(RCTPromiseResolveBlock)resolve
-                            reject:(RCTPromiseRejectBlock)reject
+- (void)getRuntimeInfoWithResolve:(ZFHPromiseResolveBlock)resolve
+                            reject:(ZFHPromiseRejectBlock)reject
 {
   @try {
     resolve(ZFHCreateRuntimeInfo());
@@ -43,8 +43,8 @@
   }
 }
 
-- (void)getRuntimeDiagnosticsWithResolve:(RCTPromiseResolveBlock)resolve
-                                  reject:(RCTPromiseRejectBlock)reject
+- (void)getRuntimeDiagnosticsWithResolve:(ZFHPromiseResolveBlock)resolve
+                                  reject:(ZFHPromiseRejectBlock)reject
 {
   @try {
     (void)ZFHResolveRuntimeDiagnostics(resolve, reject);
@@ -59,8 +59,8 @@
                       algorithm:(NSString *)algorithm
                         options:(NSDictionary *)options
                     operationId:(NSString *)operationId
-                        resolve:(RCTPromiseResolveBlock)resolve
-                         reject:(RCTPromiseRejectBlock)reject
+                        resolve:(ZFHPromiseResolveBlock)resolve
+                         reject:(ZFHPromiseRejectBlock)reject
 {
   if ([ZFHCurrentEngineName() isEqualToString:@"zig"]) {
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -78,7 +78,7 @@
     return;
   }
 
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge fileHash:filePath
                 algorithm:algorithm
                   options:options
@@ -97,8 +97,8 @@
                          encoding:(NSString *)encoding
                           options:(NSDictionary *)options
                       operationId:(NSString *)operationId
-                          resolve:(RCTPromiseResolveBlock)resolve
-                           reject:(RCTPromiseRejectBlock)reject
+                          resolve:(ZFHPromiseResolveBlock)resolve
+                           reject:(ZFHPromiseRejectBlock)reject
 {
   if ([ZFHCurrentEngineName() isEqualToString:@"zig"]) {
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -117,7 +117,7 @@
     return;
   }
 
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge stringHash:text
                   algorithm:algorithm
                    encoding:encoding
@@ -140,8 +140,8 @@
        algorithm:(NSString *)algorithm
          options:(JS::NativeFileHash::HashOptions &)options
      operationId:(NSString *)operationId
-         resolve:(RCTPromiseResolveBlock)resolve
-          reject:(RCTPromiseRejectBlock)reject
+         resolve:(ZFHPromiseResolveBlock)resolve
+          reject:(ZFHPromiseRejectBlock)reject
 {
   NSMutableDictionary *opts = ZFHOptionsDictionaryFromCodegen(options);
   if ([algorithm hasPrefix:@"HMAC-"] && opts[@"key"] == nil) {
@@ -161,8 +161,8 @@
            encoding:(NSString *)encoding
             options:(JS::NativeFileHash::HashOptions &)options
         operationId:(NSString *)operationId
-            resolve:(RCTPromiseResolveBlock)resolve
-             reject:(RCTPromiseRejectBlock)reject
+            resolve:(ZFHPromiseResolveBlock)resolve
+             reject:(ZFHPromiseRejectBlock)reject
 {
   NSMutableDictionary *opts = ZFHOptionsDictionaryFromCodegen(options);
   if ([algorithm hasPrefix:@"HMAC-"] && opts[@"key"] == nil) {
@@ -187,19 +187,19 @@
     return;
   }
 
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge cancelOperation:operationId];
 #endif
 }
 
-- (void)getRuntimeInfo:(RCTPromiseResolveBlock)resolve
-                reject:(RCTPromiseRejectBlock)reject
+- (void)getRuntimeInfo:(ZFHPromiseResolveBlock)resolve
+                reject:(ZFHPromiseRejectBlock)reject
 {
   [self getRuntimeInfoWithResolve:resolve reject:reject];
 }
 
-- (void)getRuntimeDiagnostics:(RCTPromiseResolveBlock)resolve
-                       reject:(RCTPromiseRejectBlock)reject
+- (void)getRuntimeDiagnostics:(ZFHPromiseResolveBlock)resolve
+                       reject:(ZFHPromiseRejectBlock)reject
 {
   [self getRuntimeDiagnosticsWithResolve:resolve reject:reject];
 }
@@ -217,7 +217,7 @@
 
 - (void)invalidate
 {
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge invalidate];
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1

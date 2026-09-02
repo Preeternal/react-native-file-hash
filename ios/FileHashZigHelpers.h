@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #import <Foundation/Foundation.h>
-#import <React/RCTBridgeModule.h>
+#import "ReactNative/FileHashPromiseTypes.h"
 
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
 #import "zig_files_hash_c_api.h"
@@ -16,13 +16,13 @@ BOOL ZFHPrepareZigRequest(NSString *_Nonnull algorithm,
                           NSData *_Nullable *_Nonnull keyDataOut,
                           zfh_options *_Nonnull optionsValueOut,
                           const zfh_options *_Nullable *_Nonnull optionsPtrOut,
-                          RCTPromiseRejectBlock _Nonnull reject);
+                          ZFHPromiseRejectBlock _Nonnull reject);
 
 NSData *_Nullable ZFHDecodeInputData(NSString *_Nonnull text,
                                      NSString *_Nonnull encoding,
                                      NSString *_Nullable *_Nonnull normalizedEncodingOut);
 
-void ZFHRejectZigError(zfh_error err, RCTPromiseRejectBlock _Nonnull reject);
+void ZFHRejectZigError(zfh_error err, ZFHPromiseRejectBlock _Nonnull reject);
 
 void ZFHCancelOperation(NSString *_Nonnull operationId);
 
@@ -34,13 +34,13 @@ BOOL ZFHHashFilePathWithZigFileHash(NSString *_Nonnull path,
                                     zfh_algorithm algorithm,
                                     const zfh_options *_Nullable optionsPtr,
                                     NSString *_Nullable operationId,
-                                    RCTPromiseResolveBlock _Nonnull resolve,
-                                    RCTPromiseRejectBlock _Nonnull reject);
+                                    ZFHPromiseResolveBlock _Nonnull resolve,
+                                    ZFHPromiseRejectBlock _Nonnull reject);
 
 BOOL ZFHHashFileURLWithZigFileHash(NSURL *_Nonnull streamURL,
                                    zfh_algorithm algorithm,
                                    const zfh_options *_Nullable optionsPtr,
                                    NSString *_Nullable operationId,
-                                   RCTPromiseResolveBlock _Nonnull resolve,
-                                   RCTPromiseRejectBlock _Nonnull reject);
+                                   ZFHPromiseResolveBlock _Nonnull resolve,
+                                   ZFHPromiseRejectBlock _Nonnull reject);
 #endif

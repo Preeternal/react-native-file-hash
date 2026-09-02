@@ -4,16 +4,8 @@
 
 @implementation MacFilePicker
 
-RCT_EXPORT_MODULE();
-
-+ (BOOL)requiresMainQueueSetup
-{
-  return NO;
-}
-
-RCT_EXPORT_METHOD(pickFile
-                  : (RCTPromiseResolveBlock)resolve reject
-                  : (RCTPromiseRejectBlock)reject)
+- (void)pickFile:(RCTPromiseResolveBlock)resolve
+          reject:(RCTPromiseRejectBlock)reject
 {
   dispatch_async(dispatch_get_main_queue(), ^{
     NSOpenPanel *panel = [NSOpenPanel openPanel];
@@ -40,6 +32,17 @@ RCT_EXPORT_METHOD(pickFile
       @"uri" : url.absoluteString ?: @""
     });
   });
+}
+
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+  return std::make_shared<facebook::react::NativeMacFilePickerSpecJSI>(params);
+}
+
++ (NSString *)moduleName
+{
+  return @"MacFilePicker";
 }
 
 @end

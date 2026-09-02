@@ -9,7 +9,7 @@ try {
     }
     configPlugins = require('expo/config-plugins');
 }
-const { createRunOncePlugin, withPodfile } = configPlugins;
+const { createRunOncePlugin, withInfoPlist, withPodfile } = configPlugins;
 const withAndroidGradleProperties =
     typeof configPlugins.withAndroidGradleProperties === 'function'
         ? configPlugins.withAndroidGradleProperties
@@ -99,6 +99,13 @@ function updatePodfileContents(contents, engine) {
 }
 
 function setIosEngine(config, engine) {
+    config = withInfoPlist(config, (mod) => {
+        // SwiftPM builds bundle both engines. The app selects Zig explicitly;
+        // no key means native, matching the CocoaPods default.
+        mod.modResults.ZFHEngine = engine;
+        return mod;
+    });
+
     return withPodfile(config, (mod) => {
         mod.modResults.contents = updatePodfileContents(
             mod.modResults.contents,

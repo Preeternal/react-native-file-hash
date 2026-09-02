@@ -2,6 +2,16 @@
     "name": "@preeternal/react-native-file-hash-example",
     "version": "0.0.1",
     "private": true,
+    "codegenConfig": {
+        "name": "FileHashExampleSpec",
+        "type": "modules",
+        "jsSrcsDir": "src",
+        "ios": {
+            "modulesProvider": {
+                "BenchmarkFile": "BenchmarkFileModule"
+            }
+        }
+    },
     "scripts": {
         "android": "react-native run-android",
         "ios": "react-native run-ios",
@@ -10,7 +20,7 @@
         "build:ios": "xcodebuild -workspace ios/FileHashExample.xcworkspace -scheme FileHashExample -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO"
     },
     "dependencies": {
-        "@react-native-documents/picker": "^12.0.1",
+        "@react-native-documents/picker": "patch:@react-native-documents/picker@npm%3A12.0.2#~/.yarn/patches/@react-native-documents-picker-npm-12.0.2-e8d36aaebb.patch",
         "react": "19.2.3",
         "react-native": "0.85.0",
         "react-native-safe-area-context": "^5.7.0"

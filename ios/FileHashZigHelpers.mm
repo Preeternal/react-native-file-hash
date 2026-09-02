@@ -447,7 +447,7 @@ BOOL ZFHPrepareZigRequest(NSString *algorithm,
                           NSData **keyDataOut,
                           zfh_options *optionsValueOut,
                           const zfh_options **optionsPtrOut,
-                          RCTPromiseRejectBlock reject)
+                          ZFHPromiseRejectBlock reject)
 {
   if ([algorithm isEqualToString:@"XXH3-128"]) {
     reject(@"E_UNSUPPORTED_ALGORITHM",
@@ -555,7 +555,7 @@ NSData *_Nullable ZFHDecodeInputData(NSString *text,
   return [text dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-void ZFHRejectZigError(zfh_error err, RCTPromiseRejectBlock reject)
+void ZFHRejectZigError(zfh_error err, ZFHPromiseRejectBlock reject)
 {
   NSString *message =
       [NSString stringWithUTF8String:zfh_error_message(err)] ?: @"Unknown Zig error";
@@ -610,8 +610,8 @@ BOOL ZFHHashFilePathWithZigFileHash(NSString *path,
                                     zfh_algorithm algorithm,
                                     const zfh_options *optionsPtr,
                                     NSString *operationId,
-                                    RCTPromiseResolveBlock resolve,
-                                    RCTPromiseRejectBlock reject)
+                                    ZFHPromiseResolveBlock resolve,
+                                    ZFHPromiseRejectBlock reject)
 {
   if (path.length == 0) {
     reject(@"E_INVALID_PATH", @"Invalid file path", nil);
@@ -654,8 +654,8 @@ BOOL ZFHHashFileURLWithZigFileHash(NSURL *streamURL,
                                    zfh_algorithm algorithm,
                                    const zfh_options *optionsPtr,
                                    NSString *operationId,
-                                   RCTPromiseResolveBlock resolve,
-                                   RCTPromiseRejectBlock reject)
+                                   ZFHPromiseResolveBlock resolve,
+                                   ZFHPromiseRejectBlock reject)
 {
   if (streamURL == nil) {
     reject(@"E_INVALID_PATH", @"Invalid URL for streaming fallback", nil);

@@ -66,12 +66,37 @@ bun add @preeternal/react-native-file-hash
 
 React Native autolinks the native module.
 
-For iOS, install pods:
+### iOS installation
+
+#### CocoaPods (default)
+
+CocoaPods remains the default. Existing apps and React Native versions before
+0.87 install the library normally:
+
+```bash
+cd ios && bundle exec pod install && cd ..
+```
+
+#### Swift Package Manager (React Native 0.87+)
+
+React Native 0.87 added experimental, opt-in SwiftPM integration. To migrate an
+app once:
 
 ```bash
 cd ios
-bundle exec pod install
+npx react-native spm --deintegrate
 ```
+
+After a fresh clone or in CI, generate the SwiftPM workspace before building:
+
+```bash
+cd ios
+npx react-native spm
+```
+
+Every native dependency must have a compatible `Package.swift`. If a dependency
+does not provide one, generate it with `npx react-native spm scaffold` and keep
+the manifest in a package-manager patch.
 
 ### Expo
 
@@ -404,17 +429,16 @@ selected. For the default native engine, consumers usually do not need it.
 
 ## Optional: Engine Selection
 
-This library ships with two build-time engines:
+The library has two hashing engines:
 
 - `native`: the default engine, recommended for most apps.
 - `zig`: an optional engine built on the bundled
   [`zig-files-hash`](https://github.com/Preeternal/zig-files-hash) core.
 
-The `native` engine uses platform implementations plus native C for BLAKE3 and
-XXH3. The `zig` engine can be useful when you want one portable hashing core
-shared across bindings, when you want to validate behavior against the Zig
-implementation, or when current benchmarks favor Zig for the algorithms you
-use. See [BENCHMARKS.md](./BENCHMARKS.md) for the latest engine comparison.
+The `native` engine uses platform APIs and native C implementations of BLAKE3
+and XXH3. Choose `zig` if you need the same hashing core across platforms or if
+it performs better for your workload. See [BENCHMARKS.md](./BENCHMARKS.md) for
+current measurements.
 
 ### Zig File Routing
 
@@ -445,8 +469,8 @@ that can terminate the process with `SIGBUS`.
 Package users do not need a local Zig toolchain; release artifacts include Zig
 prebuilts.
 
-The selected engine is resolved at build time. The unused engine is not linked
-into the final native binary.
+Android and CocoaPods select the engine at build time and do not link the other
+engine. The SwiftPM package links both iOS engines and selects one at runtime.
 
 ### Android
 
@@ -462,7 +486,7 @@ Android Zig currently routes `SHA-224`, `SHA-256`, `HMAC-SHA-224`, and
 `HMAC-SHA-256` through the native pipeline in the shipped generic prebuilt
 setup to avoid ARM SHA-2 latency cliffs.
 
-### iOS
+### iOS with CocoaPods
 
 Set this in your app's `ios/Podfile` before `pod install`:
 
@@ -471,6 +495,21 @@ ENV['ZFH_ENGINE'] ||= 'zig'
 ```
 
 If `ZFH_ENGINE` is omitted, `native` is used.
+
+### iOS with SwiftPM
+
+The SwiftPM package contains both engines. Select one with `ZFHEngine` in the
+app's `Info.plist`; if the key is absent, `native` is used.
+
+To select Zig in a bare React Native app, add:
+
+```xml
+<key>ZFHEngine</key>
+<string>zig</string>
+```
+
+Use `<string>native</string>` or remove the key to select the default engine.
+Then rebuild the app. You do not need to resolve packages again.
 
 ### macOS
 
@@ -494,6 +533,9 @@ example and platform-specific setup notes.
   }
 }
 ```
+
+The Expo plugin writes the Android Gradle property, CocoaPods' `ZFH_ENGINE`, and
+the `ZFHEngine` value used by SwiftPM.
 
 If `engine` is omitted, `native` is used.
 

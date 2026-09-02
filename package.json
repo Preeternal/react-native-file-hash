@@ -56,6 +56,7 @@
         "third_party/zig-files-hash-prebuilt/windows/Win32/zig_files_hash.lib",
         "third_party/zig-files-hash-prebuilt/windows/x64/zig_files_hash.lib",
         "app.plugin.js",
+        "Package.swift",
         "*.podspec",
         "react-native.config.js",
         "!ios/build",
@@ -81,7 +82,7 @@
         "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
         "prepare": "bob build",
         "prepack": "git submodule update --init --recursive",
-        "typecheck": "tsc",
+        "typecheck": "tsc -p tsconfig.build.json",
         "lint": "eslint \"**/*.{js,ts,tsx}\"",
         "test": "jest",
         "release": "release-it --only-version",
@@ -163,7 +164,8 @@
     "workspaces": [
         "example",
         "examples/macos",
-        "examples/windows"
+        "examples/windows",
+        "examples/ExampleSpm"
     ],
     "packageManager": "yarn@4.18.0",
     "react-native-builder-bob": {
@@ -226,6 +228,10 @@
         "modulePathIgnorePatterns": [
             "<rootDir>/example/node_modules",
             "<rootDir>/lib/"
+        ],
+        "testPathIgnorePatterns": [
+            "<rootDir>/example/",
+            "<rootDir>/examples/"
         ]
     },
     "commitlint": {

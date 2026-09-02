@@ -71,8 +71,8 @@
        algorithm:(NSString *)algorithm
          options:(NSDictionary *)options
      operationId:(NSString *)operationId
-         resolve:(RCTPromiseResolveBlock)resolve
-          reject:(RCTPromiseRejectBlock)reject
+         resolve:(ZFHPromiseResolveBlock)resolve
+          reject:(ZFHPromiseRejectBlock)reject
 {
   if (!ZFHEnsureZigApiCompatibility(reject)) {
     return;
@@ -163,8 +163,8 @@
           encoding:(NSString *)encoding
            options:(NSDictionary *)options
       operationId:(NSString *)operationId
-           resolve:(RCTPromiseResolveBlock)resolve
-            reject:(RCTPromiseRejectBlock)reject
+           resolve:(ZFHPromiseResolveBlock)resolve
+            reject:(ZFHPromiseRejectBlock)reject
 {
   if (!ZFHEnsureZigApiCompatibility(reject)) {
     return;

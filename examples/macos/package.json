@@ -2,6 +2,17 @@
   "name": "@preeternal/react-native-file-hash-macos-example",
   "version": "0.0.1",
   "private": true,
+  "codegenConfig": {
+    "name": "FileHashMacOSExampleSpec",
+    "type": "modules",
+    "jsSrcsDir": "specs",
+    "ios": {
+      "modulesProvider": {
+        "BenchmarkFile": "BenchmarkFileModule",
+        "MacFilePicker": "MacFilePicker"
+      }
+    }
+  },
   "scripts": {
     "macos": "react-native run-macos",
     "pods": "pod install --project-directory=macos",

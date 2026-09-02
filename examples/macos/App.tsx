@@ -16,7 +16,6 @@ import {
     ActivityIndicator,
     Alert,
     Clipboard,
-    NativeModules,
     Platform,
     Pressable,
     ScrollView,
@@ -26,19 +25,8 @@ import {
     useColorScheme,
     View,
 } from 'react-native';
-
-type MacFilePickerModule = {
-    pickFile(): Promise<{
-        name: string;
-        path: string;
-        uri: string;
-    } | null>;
-};
-
-type BenchmarkFileModule = {
-    createFile(sizeBytes: number): Promise<string>;
-    log?(message: string): void;
-};
+import BenchmarkFile from './specs/NativeBenchmarkFile';
+import MacFilePicker from './specs/NativeMacFilePicker';
 
 type BenchmarkAlgorithmResult = {
     algorithm: THashAlgorithm;
@@ -51,10 +39,6 @@ type BenchmarkAlgorithmResult = {
 };
 
 type Xxh3SeedInputMode = 'label' | 'string' | 'number' | 'bigint';
-
-const MacFilePicker = NativeModules.MacFilePicker as MacFilePickerModule;
-const BenchmarkFile = NativeModules.BenchmarkFile as
-    BenchmarkFileModule | undefined;
 
 const algorithms: THashAlgorithm[] = [
     'MD5',
@@ -441,14 +425,6 @@ function App() {
     };
 
     const runBenchmark = async () => {
-        if (!BenchmarkFile?.createFile) {
-            Alert.alert(
-                'Benchmark helper is unavailable',
-                'Rebuild the macOS example app first.'
-            );
-            return;
-        }
-
         const sizeMb = parseBoundedInt(benchmarkSizeMb, 200, 1, 4096);
         const samples = parseBoundedInt(benchmarkSamples, 3, 1, 20);
         const warmups = parseBoundedInt(benchmarkWarmups, 1, 0, 5);

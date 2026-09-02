@@ -2,6 +2,9 @@ import Foundation
 import CryptoKit
 import CommonCrypto
 import React
+#if canImport(FileHashNativeCore)
+import FileHashNativeCore
+#endif
 
 @objc(FileHashImpl)
 public class FileHashImpl: NSObject {

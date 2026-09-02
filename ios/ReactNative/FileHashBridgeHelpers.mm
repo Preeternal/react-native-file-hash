@@ -18,14 +18,12 @@ static void ZFHApplyZigVersionString(NSMutableDictionary *info)
 #endif
 }
 
-#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
 static void ZFHApplyNoZigDiagnostics(NSMutableDictionary *info)
 {
   info[@"zigApiVersion"] = @0;
   info[@"zigExpectedApiVersion"] = @0;
   info[@"zigApiCompatible"] = @NO;
 }
-#endif
 
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
 typedef struct {
@@ -76,7 +74,14 @@ static BOOL ZFHReadZigApiState(
 
 NSString *ZFHCurrentEngineName(void)
 {
-#if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
+#if defined(ZFH_SPM_DUAL_ENGINE)
+  NSString *configuredEngine = [NSBundle.mainBundle objectForInfoDictionaryKey:@"ZFHEngine"];
+  if ([configuredEngine isKindOfClass:NSString.class] &&
+      [configuredEngine caseInsensitiveCompare:@"zig"] == NSOrderedSame) {
+    return @"zig";
+  }
+  return @"native";
+#elif defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
   return @"zig";
 #else
   return @"native";
@@ -91,11 +96,17 @@ NSMutableDictionary *ZFHCreateRuntimeInfo(void)
 }
 
 BOOL ZFHResolveRuntimeDiagnostics(
-    RCTPromiseResolveBlock resolve,
-    RCTPromiseRejectBlock reject)
+    ZFHPromiseResolveBlock resolve,
+    ZFHPromiseRejectBlock reject)
 {
   NSMutableDictionary *info = ZFHCreateRuntimeInfo();
   ZFHApplyZigVersionString(info);
+
+  if (![info[@"engine"] isEqualToString:@"zig"]) {
+    ZFHApplyNoZigDiagnostics(info);
+    resolve(info);
+    return YES;
+  }
 
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
   ZFHZigApiState state;
@@ -119,7 +130,7 @@ BOOL ZFHResolveRuntimeDiagnostics(
   return YES;
 }
 
-BOOL ZFHEnsureZigApiCompatibility(RCTPromiseRejectBlock reject)
+BOOL ZFHEnsureZigApiCompatibility(ZFHPromiseRejectBlock reject)
 {
 #if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   reject(ZFHErrorUnsupportedEngine,

@@ -1,27 +1,19 @@
 #import <Foundation/Foundation.h>
-#import <React/RCTBridgeModule.h>
+#import <FileHashExampleSpec/FileHashExampleSpec.h>
 
 static const NSUInteger ZFHBenchmarkChunkSize = 1024 * 1024;
 
-@interface BenchmarkFileModule : NSObject <RCTBridgeModule>
+@interface BenchmarkFileModule : NSObject <NativeBenchmarkFileSpec>
 @end
 
 @implementation BenchmarkFileModule
 
-RCT_EXPORT_MODULE(BenchmarkFile)
-
-+ (BOOL)requiresMainQueueSetup
-{
-  return NO;
-}
-
-RCT_REMAP_METHOD(createFile,
-                 createFileWithSizeBytes:(nonnull NSNumber *)sizeBytes
-                 resolver:(RCTPromiseResolveBlock)resolve
-                 rejecter:(RCTPromiseRejectBlock)reject)
+- (void)createFile:(double)sizeBytes
+            resolve:(RCTPromiseResolveBlock)resolve
+             reject:(RCTPromiseRejectBlock)reject
 {
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-    long long requestedSize = sizeBytes.longLongValue;
+    long long requestedSize = (long long)sizeBytes;
     if (requestedSize <= 0) {
       reject(@"E_INVALID_SIZE", @"Benchmark file size must be positive", nil);
       return;
@@ -69,7 +61,7 @@ RCT_REMAP_METHOD(createFile,
     }
 
     NSMutableData *chunk = [NSMutableData dataWithLength:ZFHBenchmarkChunkSize];
-    uint8_t *bytes = chunk.mutableBytes;
+    uint8_t *bytes = static_cast<uint8_t *>(chunk.mutableBytes);
     for (NSUInteger i = 0; i < ZFHBenchmarkChunkSize; i += 1) {
       bytes[i] = (uint8_t)(i & 0xff);
     }
@@ -96,9 +88,20 @@ RCT_REMAP_METHOD(createFile,
   });
 }
 
-RCT_EXPORT_METHOD(log:(NSString *)message)
+- (void)log:(NSString *)message
 {
   NSLog(@"%@", message);
+}
+
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+  return std::make_shared<facebook::react::NativeBenchmarkFileSpecJSI>(params);
+}
+
++ (NSString *)moduleName
+{
+  return @"BenchmarkFile";
 }
 
 @end

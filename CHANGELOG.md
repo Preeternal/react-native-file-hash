@@ -1,6 +1,6 @@
 # Releases
 
-## v3.0.0 - New Architecture only
+## v3.0.0 (нерелижено) — SwiftPM support and New Architecture only
 
 ### Breaking changes
 
@@ -9,11 +9,18 @@
 
 ### Changed
 
-- Updated the project to the `create-react-native-library` `0.63.0` template
-  baseline and refreshed its development toolchain.
-- iOS now registers `FileHash` only through the generated TurboModule spec;
-  the legacy `RCTBridgeModule` and `RCT_EXPORT_METHOD` implementation was
-  removed.
+- Updated the library template to `create-react-native-library` `0.63.0`.
+- Added iOS SwiftPM support for React Native 0.87. CocoaPods remains the default.
+- Added the RN 0.87 `examples/ExampleSpm` app with a file picker and native
+  benchmark-file module.
+- The SwiftPM package contains both iOS engines. Set `ZFHEngine=zig` in the
+  app's Info.plist to use Zig; without the key it uses `native`. CocoaPods still
+  selects the engine at build time with `ZFH_ENGINE`.
+- Updated `@react-native-documents/picker` to v12.0.2 and patched its SwiftPM
+  manifest.
+- Moved the iOS Swift, C/C++, and React Native sources into separate directories.
+- Removed the old iOS bridge registration. `FileHash` is now registered through
+  its generated TurboModule spec.
 - Android now relies solely on the generated `NativeFileHashSpec` methods.
 
 ---

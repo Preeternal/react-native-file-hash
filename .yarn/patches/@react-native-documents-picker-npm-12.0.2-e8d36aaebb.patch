@@ -1,0 +1,189 @@
+diff --git a/Package.swift b/Package.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3381059164fc8a31f0d976d09bc79713417743a
+--- /dev/null
++++ b/Package.swift
+@@ -0,0 +1,65 @@
++// swift-tools-version: 6.0
++
++import PackageDescription
++
++let reactHeaders: [Target.Dependency] = [
++  .product(name: "ReactHeaders", package: "ReactNative"),
++  .product(name: "ReactNativeHeaders", package: "ReactNative"),
++  .product(name: "ReactNativeDependenciesHeaders", package: "ReactNative"),
++  .product(name: "ReactAppHeaders", package: "React-GeneratedCode"),
++]
++
++let package = Package(
++  name: "ReactNativeDocumentsPicker",
++  platforms: [.iOS(.v15)],
++  products: [
++    .library(name: "Picker", targets: ["ReactNativeDocumentsPicker"]),
++  ],
++  dependencies: [
++    .package(name: "ReactNative", path: "../../../../xcframeworks"),
++    .package(name: "React-GeneratedCode", path: "../../../ios"),
++  ],
++  targets: [
++    .target(
++      name: "ReactNativeDocumentsPickerSwift",
++      dependencies: reactHeaders,
++      path: "ios/swift",
++      linkerSettings: [
++        .linkedFramework("Foundation"),
++        .linkedFramework("UIKit"),
++        .linkedFramework("UniformTypeIdentifiers"),
++      ]
++    ),
++    .target(
++      name: "ReactNativeDocumentsPicker",
++      dependencies: ["ReactNativeDocumentsPickerSwift"] + reactHeaders,
++      path: "ios",
++      sources: ["RNDocumentPicker.mm"],
++      publicHeadersPath: ".",
++      cSettings: [.headerSearchPath(".")],
++      cxxSettings: [
++        .headerSearchPath("."),
++        .unsafeFlags([
++          "-DFOLLY_NO_CONFIG",
++          "-DFOLLY_MOBILE=1",
++          "-DFOLLY_USE_LIBCPP=1",
++          "-DFOLLY_CFG_NO_COROUTINES=1",
++          "-DFOLLY_HAVE_CLOCK_GETTIME=1",
++          "-Wno-comma",
++          "-Wno-shorten-64-to-32",
++          "-DRN_FABRIC_ENABLED",
++          "-fcxx-modules",
++        ]),
++        .define("DEBUG", .when(configuration: .debug)),
++        .define("NDEBUG", .when(configuration: .release)),
++      ],
++      linkerSettings: [
++        .linkedFramework("Foundation"),
++        .linkedFramework("UIKit"),
++        .linkedFramework("UniformTypeIdentifiers"),
++      ]
++    ),
++  ],
++  swiftLanguageModes: [.v5],
++  cxxLanguageStandard: .cxx20
++)
+diff --git a/ios/RNDocumentPicker.mm b/ios/RNDocumentPicker.mm
+index b31f00970609691e01dd571a5b960b02102adc81..69b2653f3e279533803148b08d1797e3de90560b 100644
+--- a/ios/RNDocumentPicker.mm
++++ b/ios/RNDocumentPicker.mm
+@@ -8,7 +8,9 @@
+ // if it cannot be found, try cleaning the build folder and Xcode derived data folder
+ 
+ // When using use_frameworks! :linkage => :static in Podfile
+-#if __has_include(<react_native_document_picker/react_native_document_picker-Swift.h>)
++#if defined(SWIFT_PACKAGE)
++@import ReactNativeDocumentsPickerSwift;
++#elif __has_include(<react_native_document_picker/react_native_document_picker-Swift.h>)
+ #import <react_native_document_picker/react_native_document_picker-Swift.h>
+ #else
+ #import "react_native_document_picker-Swift.h"
+diff --git a/ios/swift/DocPicker.swift b/ios/swift/DocPicker.swift
+index a5b5b070c1d62d895f89c19bbf205e2ef7df7dbc..b211cc350981aaf94fd4003573de765e9e93b5d6 100644
+--- a/ios/swift/DocPicker.swift
++++ b/ios/swift/DocPicker.swift
+@@ -1,6 +1,7 @@
+ // LICENSE: see License.md in the package root
+ 
+ import Foundation
++import UIKit
+ import UniformTypeIdentifiers
+ 
+ @objc public class DocPicker: PickerBase {
+diff --git a/ios/swift/DocSaver.swift b/ios/swift/DocSaver.swift
+index 9d0f0b6bb635ccaeb0f89f55ebc814267e0e492e..1c3103fff37fd23fb1ccafa389fa5ea75aa7537b 100644
+--- a/ios/swift/DocSaver.swift
++++ b/ios/swift/DocSaver.swift
+@@ -8,6 +8,7 @@
+ // LICENSE: see License.md in the package root
+ 
+ import Foundation
++import UIKit
+ import UniformTypeIdentifiers
+ 
+ @objc public class DocSaver: PickerBase {
+diff --git a/ios/swift/ModalStyles.swift b/ios/swift/ModalStyles.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ffcd5a46744a30240dd07d37ae1676698bc3da0
+--- /dev/null
++++ b/ios/swift/ModalStyles.swift
+@@ -0,0 +1,27 @@
++import UIKit
++
++func documentPickerTransitionStyle(_ value: String) -> UIModalTransitionStyle? {
++  switch value {
++  case "coverVertical": return .coverVertical
++  case "flipHorizontal": return .flipHorizontal
++  case "crossDissolve": return .crossDissolve
++  case "partialCurl": return .partialCurl
++  default: return nil
++  }
++}
++
++func documentPickerPresentationStyle(_ value: String) -> UIModalPresentationStyle? {
++  switch value {
++  case "fullScreen": return .fullScreen
++  case "pageSheet": return .pageSheet
++  case "formSheet": return .formSheet
++  case "currentContext": return .currentContext
++  case "custom": return .custom
++  case "overFullScreen": return .overFullScreen
++  case "overCurrentContext": return .overCurrentContext
++  case "popover": return .popover
++  case "none": return .none
++  case "automatic": return .automatic
++  default: return nil
++  }
++}
+diff --git a/ios/swift/PickerBase.swift b/ios/swift/PickerBase.swift
+index 05304e17b8de510c06573ea7f341b1985ef480ab..142dc6d19ddaec82aba66a6c89a3708f92385dbf 100644
+--- a/ios/swift/PickerBase.swift
++++ b/ios/swift/PickerBase.swift
+@@ -8,6 +8,7 @@
+ // LICENSE: see License.md in the package root
+ 
+ import Foundation
++import UIKit
+ import UniformTypeIdentifiers
+ import React
+ 
+diff --git a/ios/swift/PickerOptions.swift b/ios/swift/PickerOptions.swift
+index 98ee79ae80a3224c555c3c9d609bd7d10b15db96..3cdc2fd94cc3eb5e0ac0ffeb41dde73d36bf871c 100644
+--- a/ios/swift/PickerOptions.swift
++++ b/ios/swift/PickerOptions.swift
+@@ -35,10 +35,10 @@ public struct PickerOptions: Sendable {
+     self.requestLongTermAccess = requestLongTermAccess
+ 
+     if let transitionStyle = dictionary["transitionStyle"] as? String {
+-      self.transitionStyle = RCTConvert.uiModalTransitionStyle(transitionStyle)
++      self.transitionStyle = documentPickerTransitionStyle(transitionStyle)
+     }
+     if let presentationStyle = dictionary["presentationStyle"] as? String {
+-      self.presentationStyle = RCTConvert.uiModalPresentationStyle(presentationStyle)
++      self.presentationStyle = documentPickerPresentationStyle(presentationStyle)
+     }
+     if let initialDirectoryUri = dictionary["initialDirectoryUri"] as? String, let url = URL(string: initialDirectoryUri) {
+       self.initialDirectoryUri = url
+diff --git a/ios/swift/SaverOptions.swift b/ios/swift/SaverOptions.swift
+index b6c4b458d61c07638eb28a36acee9fdfe1103688..7791f9ddd544eac8275de0b0984a71eb559316d8 100644
+--- a/ios/swift/SaverOptions.swift
++++ b/ios/swift/SaverOptions.swift
+@@ -23,10 +23,10 @@ public struct SaverOptions: Sendable {
+     self.shouldShowFileExtensions = shouldShowFileExtensions
+ 
+     if let transitionStyle = dictionary["transitionStyle"] as? String {
+-      self.transitionStyle = RCTConvert.uiModalTransitionStyle(transitionStyle)
++      self.transitionStyle = documentPickerTransitionStyle(transitionStyle)
+     }
+     if let presentationStyle = dictionary["presentationStyle"] as? String {
+-      self.presentationStyle = RCTConvert.uiModalPresentationStyle(presentationStyle)
++      self.presentationStyle = documentPickerPresentationStyle(presentationStyle)
+     }
+     if let initialDirectoryUri = dictionary["initialDirectoryUri"] as? String, let url = URL(string: initialDirectoryUri) {
+       self.initialDirectoryUri = url

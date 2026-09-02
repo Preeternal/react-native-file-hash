@@ -25,10 +25,11 @@ if engine == "zig" && !File.directory?(File.join(__dir__, zig_ios_xcframework))
 end
 
 zig_source_files = [
-  "ios/FileHash.h",
-  "ios/FileHash.mm",
-  "ios/FileHashBridgeHelpers.h",
-  "ios/FileHashBridgeHelpers.mm",
+  "ios/ReactNative/FileHash.h",
+  "ios/ReactNative/FileHash.mm",
+  "ios/ReactNative/FileHashBridgeHelpers.h",
+  "ios/ReactNative/FileHashPromiseTypes.h",
+  "ios/ReactNative/FileHashBridgeHelpers.mm",
   "ios/FileHashBridgeZig.h",
   "ios/FileHashBridgeZig.mm",
   "ios/FileHashZigHelpers.h",
@@ -36,22 +37,24 @@ zig_source_files = [
 ]
 
 zig_private_header_files = [
-  "ios/FileHash.h",
-  "ios/FileHashBridgeHelpers.h",
+  "ios/ReactNative/FileHash.h",
+  "ios/ReactNative/FileHashBridgeHelpers.h",
+  "ios/ReactNative/FileHashPromiseTypes.h",
   "ios/FileHashBridgeZig.h",
   "ios/FileHashZigHelpers.h"
 ]
 
 native_source_files = [
-  "ios/FileHash.h",
-  "ios/FileHash.mm",
-  "ios/FileHash.swift",
-  "ios/HashNative.h",
-  "ios/HashNative.mm",
-  "ios/FileHashBridgeHelpers.h",
-  "ios/FileHashBridgeHelpers.mm",
-  "ios/FileHashBridgeNative.h",
-  "ios/FileHashBridgeNative.m",
+  "ios/ReactNative/FileHash.h",
+  "ios/ReactNative/FileHash.mm",
+  "ios/NativeSwift/FileHash.swift",
+  "ios/NativeCore/HashNative.h",
+  "ios/NativeCore/HashNative.mm",
+  "ios/ReactNative/FileHashBridgeHelpers.h",
+  "ios/ReactNative/FileHashPromiseTypes.h",
+  "ios/ReactNative/FileHashBridgeHelpers.mm",
+  "ios/ReactNative/FileHashBridgeNative.h",
+  "ios/ReactNative/FileHashBridgeNative.m",
   "third_party/xxhash/xxhash.{c,h}",
   "third_party/blake3/c/blake3.c",
   "third_party/blake3/c/blake3_dispatch.c",
@@ -73,7 +76,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/Preeternal/react-native-file-hash.git", :tag => "#{s.version}" }
 
   s.swift_version = "5.9"
-  native_header_search_paths = "$(inherited) $(PODS_TARGET_SRCROOT)/third_party/xxhash $(PODS_TARGET_SRCROOT)/third_party/blake3/c"
+  native_header_search_paths = "$(inherited) $(PODS_TARGET_SRCROOT)/ios/NativeCore $(PODS_TARGET_SRCROOT)/third_party/xxhash $(PODS_TARGET_SRCROOT)/third_party/blake3/c"
   zig_header_search_paths = "$(inherited) $(PODS_TARGET_SRCROOT)/third_party/zig-files-hash/src"
 
   ios_header_search_paths = if is_zig
@@ -129,12 +132,13 @@ Pod::Spec.new do |s|
     # FileHash.h imports the C++ codegen spec and must not be pulled into the
     # Swift module. FileHash.swift only needs this C API from HashNative.h.
     s.ios.public_header_files = [
-      "ios/HashNative.h"
+      "ios/NativeCore/HashNative.h"
     ]
     s.ios.private_header_files = [
-      "ios/FileHash.h",
-      "ios/FileHashBridgeNative.h",
-      "ios/FileHashBridgeHelpers.h",
+      "ios/ReactNative/FileHash.h",
+      "ios/ReactNative/FileHashBridgeNative.h",
+      "ios/ReactNative/FileHashBridgeHelpers.h",
+      "ios/ReactNative/FileHashPromiseTypes.h",
       "third_party/**/*.h"
     ]
   end

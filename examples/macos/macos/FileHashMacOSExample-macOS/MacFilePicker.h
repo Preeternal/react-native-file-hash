@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#import <React/RCTBridgeModule.h>
+#import <FileHashMacOSExampleSpec/FileHashMacOSExampleSpec.h>
 
-@interface MacFilePicker : NSObject <RCTBridgeModule>
+@interface MacFilePicker : NSObject <NativeMacFilePickerSpec>
 @end

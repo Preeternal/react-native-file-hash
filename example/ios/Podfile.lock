@@ -1384,7 +1384,7 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
-  - react-native-document-picker (12.0.1):
+  - react-native-document-picker (12.0.2):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2098,7 +2098,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   FBLazyVector: c00c20551d40126351a6783c47ce75f5b374851b
-  FileHash: 03dc878033091ec4b6e70632b0868eb20448b66d
+  FileHash: e7bdffc3e08a18048480bf9011437cfbe83edc7f
   hermes-engine: 0ea749613fa10e2b07a40044df86ae2c78ed7e30
   RCTDeprecation: 3bb167081b134461cfeb875ff7ae1945f8635257
   RCTRequired: 74839f55d5058a133a0bc4569b0afec750957f64
@@ -2136,7 +2136,7 @@ SPEC CHECKSUMS:
   React-logger: ee47d5f3b59a46a006c65038ed5d0b1143e37510
   React-Mapbuffer: 7f8bfbe3fcb2203db4ccb3975414af8cabe4bcd0
   React-microtasksnativemodule: ca1f33f7c98b76d923f550d39631eb4e05fa9aec
-  react-native-document-picker: 15cca2d1a6bfb6d0d3ff0283bd9b903e57cb028b
+  react-native-document-picker: c3a7536f3ee52525b4714c3720537f941d0cb094
   react-native-safe-area-context: 6b4966397ada0f7dd481e4486a2ef936834861a1
   React-NativeModulesApple: 9c1f8815ebd72cc1c75587fe588513f6dd9cb708
   React-networking: 8f75f882c6794e91e28b458b5bc1461034098c80
@@ -2169,7 +2169,7 @@ SPEC CHECKSUMS:
   React-utils: 5717eed2e4c96e4d8ad0718c2f63494c06c19e47
   React-webperformancenativemodule: c465a47195d1c6f3cd7eeb84f38389124b62ac73
   ReactAppDependencyProvider: 5787b37b8e2e51dfeab697ec031cc7c4080dcea2
-  ReactCodegen: b3184a229afd01e7f8058dd81b805b843caa2bf9
+  ReactCodegen: f47e807f139df541237612d7f4e977a030aae645
   ReactCommon: fe2a3af8975e63efa60f95fca8c34dc85deee360
   ReactNativeDependencies: 3684b8e3aa8c94eeed2f1f03624ae8bda9fad822
   Yoga: e83c3121d079541e69f3c5c623faaaf933fb5812
