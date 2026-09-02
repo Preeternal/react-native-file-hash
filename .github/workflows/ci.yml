@@ -427,7 +427,7 @@ jobs:
               uses: ./.github/actions/setup
 
             - name: Set up JDK 17
-              uses: actions/setup-java@c5195e0cf7fb5bb9c8041db8e1d5d2e004e7bf5b # v4.7.1
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
               with:
                   distribution: zulu
                   java-version: 17
