@@ -79,10 +79,11 @@
     ],
     "scripts": {
         "example": "yarn workspace @preeternal/react-native-file-hash-example",
-        "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+        "example:spm": "yarn workspace ExampleSpm",
+        "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build examples/ExampleSpm/android/build examples/ExampleSpm/android/app/build examples/ExampleSpm/ios/build lib",
         "prepare": "bob build",
         "prepack": "git submodule update --init --recursive",
-        "typecheck": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc -p tsconfig.build.json && yarn workspace ExampleSpm typecheck",
         "lint": "eslint \"**/*.{js,ts,tsx}\"",
         "test": "jest",
         "release": "release-it --only-version",
