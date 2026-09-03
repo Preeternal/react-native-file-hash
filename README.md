@@ -321,6 +321,7 @@ type HashRequest = {
   algorithm?: THashAlgorithm;
   hashOptions?: HashOptions;
   signal?: HashAbortSignal;
+  mmap?: boolean;
 };
 
 type StringHashRequest = {
@@ -339,25 +340,6 @@ type HashOptions = {
 
 The exported `HashAbortSignal` type is intentionally compatible with
 `AbortController.signal`.
-
-### Deprecated Call Forms
-
-The positional overloads still work, but the object-style request API is the
-recommended form because it avoids placeholder arguments and supports
-cancellation cleanly.
-
-```ts
-// Deprecated, still supported for migration.
-await fileHash(fileUri, 'SHA-256');
-await stringHash('hello', 'SHA-256', 'utf8');
-
-// Recommended.
-await fileHash(fileUri, { algorithm: 'SHA-256' });
-await stringHash('hello', { algorithm: 'SHA-256', encoding: 'utf8' });
-```
-
-`hashString(...)` is a deprecated alias for `stringHash(...)` and will be
-removed in a future major release.
 
 ## Algorithms
 

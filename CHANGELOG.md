@@ -6,6 +6,9 @@
 
 - Removed React Native Old Architecture support. `@preeternal/react-native-file-hash`
   now requires the New Architecture and its TurboModule/codegen integration.
+- Removed the deprecated positional overloads for `fileHash` and `stringHash`.
+  Pass a request object as the second argument instead.
+- Removed the deprecated `hashString(...)` alias; use `stringHash(...)`.
 
 ### Changed
 

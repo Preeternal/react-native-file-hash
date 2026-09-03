@@ -132,6 +132,28 @@ describe('fileHash options validation', () => {
         );
     });
 
+    it('rejects removed positional fileHash calls', async () => {
+        await expect(fileHash('path', 'SHA-512' as any)).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.fileHash).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed fileHash options after an omitted algorithm', async () => {
+        const positionalFileHash = fileHash as (
+            ...args: unknown[]
+        ) => Promise<string>;
+
+        await expect(
+            positionalFileHash('path', undefined, {})
+        ).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.fileHash).not.toHaveBeenCalled();
+    });
+
     it('requires key for HMAC algorithms', async () => {
         await expect(
             fileHash('p', { algorithm: 'HMAC-SHA-256' })
@@ -354,6 +376,30 @@ describe('stringHash mirrors validation', () => {
             {},
             undefined
         );
+    });
+
+    it('rejects removed positional stringHash calls', async () => {
+        await expect(stringHash('abc', 'SHA-512' as any)).rejects.toMatchObject(
+            {
+                code: 'E_INVALID_ARGUMENT',
+                message: expect.stringContaining('expects a request object'),
+            }
+        );
+        expect(FileHash.stringHash).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed string encoding after an omitted algorithm', async () => {
+        const positionalStringHash = stringHash as (
+            ...args: unknown[]
+        ) => Promise<string>;
+
+        await expect(
+            positionalStringHash('YWJj', undefined, 'base64')
+        ).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.stringHash).not.toHaveBeenCalled();
     });
 
     it('rejects missing key for HMAC algorithm', async () => {
