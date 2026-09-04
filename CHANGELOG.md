@@ -26,6 +26,10 @@
   its generated TurboModule spec.
 - Android now relies solely on the generated `NativeFileHashSpec` methods.
 
+### Fixed
+
+- Android: Fix a Kotlin plugin conflict when building with AGP 9’s built-in Kotlin support enabled, while preserving compatibility with AGP 8.
+
 ---
 
 ## v2.0.8 - Zig fd/path hashing and mmap request hint
