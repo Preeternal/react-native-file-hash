@@ -451,6 +451,11 @@ jobs:
                   JAVA_OPTS: '-XX:MaxHeapSize=6g'
               run: yarn example:spm build:android
 
+            - name: Verify benchmark TurboModule registration
+              run: |
+                  grep -Fq 'add(BenchmarkFilePackage())' examples/ExampleSpm/android/app/src/main/java/com/examplespm/MainApplication.kt
+                  grep -Fq ': NativeBenchmarkFileSpec' examples/ExampleSpm/android/app/src/main/java/com/examplespm/BenchmarkFileModule.kt
+
     build-ios-spm-rn87:
         runs-on: macos-latest
 
