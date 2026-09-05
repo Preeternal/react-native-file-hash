@@ -57,6 +57,7 @@
         "third_party/zig-files-hash-prebuilt/windows/x64/zig_files_hash.lib",
         "app.plugin.js",
         "Package.swift",
+        "scripts/spm-autolinking-plugin.js",
         "*.podspec",
         "react-native.config.js",
         "!ios/build",

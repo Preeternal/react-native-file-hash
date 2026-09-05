@@ -451,8 +451,8 @@ that can terminate the process with `SIGBUS`.
 Package users do not need a local Zig toolchain; release artifacts include Zig
 prebuilts.
 
-Android and CocoaPods select the engine at build time and do not link the other
-engine. The SwiftPM package links both iOS engines and selects one at runtime.
+Android, CocoaPods, and SwiftPM select the engine at build time and do not link
+the other engine.
 
 ### Android
 
@@ -480,8 +480,9 @@ If `ZFH_ENGINE` is omitted, `native` is used.
 
 ### iOS with SwiftPM
 
-The SwiftPM package contains both engines. Select one with `ZFHEngine` in the
-app's `Info.plist`; if the key is absent, `native` is used.
+SwiftPM compiles and links exactly one engine. React Native's SPM autolinking
+plugin reads `ZFHEngine` from the app's `Info.plist` when it generates the
+package; if the key is absent, `native` is used.
 
 To select Zig in a bare React Native app, add:
 
@@ -491,7 +492,13 @@ To select Zig in a bare React Native app, add:
 ```
 
 Use `<string>native</string>` or remove the key to select the default engine.
-Then rebuild the app. You do not need to resolve packages again.
+Because this changes the SwiftPM dependency graph, run
+`npx react-native spm` before building to guarantee that the very next build uses
+the selected engine. In an app where SwiftPM is already set up, this updates the
+existing integration. Xcode's SPM auto-sync also watches existing `Info.plist`
+files, but Xcode can resolve the old package graph before the sync pre-action
+runs; in that case the automatically detected change takes effect on the
+following build. The generated package contains only the selected core.
 
 ### macOS
 

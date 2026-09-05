@@ -100,7 +100,7 @@ function updatePodfileContents(contents, engine) {
 
 function setIosEngine(config, engine) {
     config = withInfoPlist(config, (mod) => {
-        // SwiftPM builds bundle both engines. The app selects Zig explicitly;
+        // SwiftPM's autolinking plugin compiles only the engine selected here.
         // no key means native, matching the CocoaPods default.
         mod.modResults.ZFHEngine = engine;
         return mod;

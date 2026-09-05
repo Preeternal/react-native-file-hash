@@ -20,7 +20,11 @@ fresh clone, in CI, and after changing native dependencies.
 
 This example selects Zig with `ZFHEngine` in
 [`Info.plist`](./ios/ExampleSpm/Info.plist). Change the value to `native`, or
-remove the key, to use the default engine.
+remove the key, then rerun either command above to use the default engine. The
+example's `ios` and `build:ios` scripts run `spm:update` first; that script calls
+the supported `react-native spm` command so the selected graph is ready before
+Xcode starts. The migration-oriented `spm:setup` is not needed when only the
+engine changes. The generated Swift package links only the selected core.
 
 To run the app with Metro:
 

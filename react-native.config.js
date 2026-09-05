@@ -13,4 +13,7 @@ module.exports = {
             },
         },
     },
+    spm: {
+        autolinkingPlugin: './scripts/spm-autolinking-plugin.js',
+    },
 };

@@ -22,10 +22,6 @@ let package = Package(
     .package(name: "React-GeneratedCode", path: "../../../ios"),
   ],
   targets: [
-    .binaryTarget(
-      name: "ZigFilesHash",
-      path: "third_party/zig-files-hash-prebuilt/ios/ZigFilesHash.xcframework"
-    ),
     .target(
       name: "FileHashNativeCore",
       path: "ios/NativeCore",
@@ -59,7 +55,7 @@ let package = Package(
     ),
     .target(
       name: "ReactNativeFileHash",
-      dependencies: ["FileHashNative", "ZigFilesHash"] + reactHeaders,
+      dependencies: ["FileHashNative"] + reactHeaders,
       path: "ios",
       sources: [
         "ReactNative/FileHash.h",
@@ -69,17 +65,11 @@ let package = Package(
         "ReactNative/FileHashBridgeHelpers.mm",
         "ReactNative/FileHashBridgeNative.h",
         "ReactNative/FileHashBridgeNative.m",
-        "FileHashBridgeZig.h",
-        "FileHashBridgeZig.mm",
-        "FileHashZigHelpers.h",
-        "FileHashZigHelpers.mm",
       ],
       publicHeadersPath: "ReactNative",
       cSettings: [
         .headerSearchPath("ReactNative"),
         .headerSearchPath("."),
-        .define("ZFH_ENGINE_ZIG", to: "1"),
-        .define("ZFH_SPM_DUAL_ENGINE", to: "1"),
       ],
       cxxSettings: [
         .headerSearchPath("ReactNative"),
@@ -95,8 +85,6 @@ let package = Package(
           "-DRN_FABRIC_ENABLED",
           "-fno-modules",
         ]),
-        .define("ZFH_ENGINE_ZIG", to: "1"),
-        .define("ZFH_SPM_DUAL_ENGINE", to: "1"),
         .define("DEBUG", .when(configuration: .debug)),
         .define("NDEBUG", .when(configuration: .release)),
       ],

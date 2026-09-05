@@ -1,6 +1,6 @@
 #import "FileHashBridgeNative.h"
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
 #if defined(SWIFT_PACKAGE)
 @import FileHashNative;
 #elif __has_include(<FileHashNative/FileHashNative-Swift.h>)

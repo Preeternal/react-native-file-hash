@@ -16,10 +16,11 @@
 - Added iOS SwiftPM support for React Native 0.87. CocoaPods remains the default.
 - Added the RN 0.87 `examples/ExampleSpm` app with a file picker and native
   benchmark-file module.
-- The SwiftPM package contains both iOS engines. Set `ZFHEngine=zig` in the
-  app's Info.plist to use Zig; without the key it uses `native`. CocoaPods still
-  selects the engine at build time with `ZFH_ENGINE`.
-- Updated `@react-native-documents/picker` to v12.0.2 and patched its SwiftPM
+- SwiftPM selects one iOS engine at build time through React Native's SPM
+  autolinking plugin. Set `ZFHEngine=zig` in the app's Info.plist to compile and
+  link Zig; without the key it compiles and links only `native`. CocoaPods uses
+  the build-time `ZFH_ENGINE` setting.
+- Updated `@react-native-documents/picker` to v12.0.2 in example and patched its SwiftPM
   manifest.
 - Moved the iOS Swift, C/C++, and React Native sources into separate directories.
 - Removed the old iOS bridge registration. `FileHash` is now registered through

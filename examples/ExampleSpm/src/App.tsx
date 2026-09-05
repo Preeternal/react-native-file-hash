@@ -22,7 +22,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -38,6 +37,8 @@ type PickedFile = {
   displayUri: string;
   size?: number | null;
 };
+
+const topInset = Platform.OS === 'ios' ? 44 : 0;
 
 const algorithms: THashAlgorithm[] = [
   'MD5',
@@ -647,14 +648,19 @@ function AppContent() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: palette.bg, paddingTop: topInset },
+      ]}
+    >
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View
         pointerEvents="none"
         style={[
           styles.runtimeBadge,
           {
-            top: 8,
+            top: topInset + 8,
             right: 8,
             backgroundColor: isDarkMode
               ? 'rgba(23, 26, 32, 0.82)'
@@ -1342,7 +1348,7 @@ function AppContent() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

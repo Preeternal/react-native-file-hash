@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import "FileHashPromiseTypes.h"
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
 @interface FileHashBridgeNative : NSObject
 
 - (void)fileHash:(NSString *)filePath

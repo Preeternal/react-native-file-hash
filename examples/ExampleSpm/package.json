@@ -15,12 +15,13 @@
   "scripts": {
     "android": "react-native run-android",
     "build:android": "react-native build-android --mode release --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
-    "build:ios": "xcodebuild -project ios/ExampleSpm.xcodeproj -scheme ExampleSpm -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO",
-    "ios": "react-native run-ios",
+    "build:ios": "yarn spm:update && xcodebuild -project ios/ExampleSpm.xcodeproj -scheme ExampleSpm -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO",
+    "ios": "yarn spm:update && react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
     "spm:setup": "cd ios && env RCT_SPM_AUTOLINKING_CONFIG_COMMAND='[\"node\",\"scripts/spm-autolinking-config.js\"]' react-native spm --deintegrate",
+    "spm:update": "cd ios && react-native spm",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

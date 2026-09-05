@@ -74,14 +74,7 @@ static BOOL ZFHReadZigApiState(
 
 NSString *ZFHCurrentEngineName(void)
 {
-#if defined(ZFH_SPM_DUAL_ENGINE)
-  NSString *configuredEngine = [NSBundle.mainBundle objectForInfoDictionaryKey:@"ZFHEngine"];
-  if ([configuredEngine isKindOfClass:NSString.class] &&
-      [configuredEngine caseInsensitiveCompare:@"zig"] == NSOrderedSame) {
-    return @"zig";
-  }
-  return @"native";
-#elif defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
+#if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
   return @"zig";
 #else
   return @"native";

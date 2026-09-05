@@ -1,7 +1,7 @@
 #import "FileHash.h"
 #import "FileHashBridgeHelpers.h"
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
 #import "FileHashBridgeNative.h"
 #endif
 
@@ -10,7 +10,7 @@
 #endif
 
 @implementation FileHash {
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   FileHashBridgeNative *_nativeBridge;
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -21,7 +21,7 @@
 - (instancetype)init
 {
   if (self = [super init]) {
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
     _nativeBridge = [FileHashBridgeNative new];
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
@@ -78,7 +78,7 @@
     return;
   }
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge fileHash:filePath
                 algorithm:algorithm
                   options:options
@@ -117,7 +117,7 @@
     return;
   }
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge stringHash:text
                   algorithm:algorithm
                    encoding:encoding
@@ -187,7 +187,7 @@
     return;
   }
 
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge cancelOperation:operationId];
 #endif
 }
@@ -217,7 +217,7 @@
 
 - (void)invalidate
 {
-#if defined(ZFH_SPM_DUAL_ENGINE) || !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
+#if !defined(ZFH_ENGINE_ZIG) || ZFH_ENGINE_ZIG != 1
   [_nativeBridge invalidate];
 #endif
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1
