@@ -1,3 +1,4 @@
+// C ABI helpers for the Zig engine. The core lives in third_party.
 #include <stdint.h>
 
 #import <Foundation/Foundation.h>

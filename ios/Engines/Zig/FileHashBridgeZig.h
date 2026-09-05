@@ -1,3 +1,4 @@
+// React Native integration for the Zig engine. The core lives in third_party.
 #import <Foundation/Foundation.h>
 #import "ReactNative/FileHashPromiseTypes.h"
 

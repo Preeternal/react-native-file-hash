@@ -1,3 +1,4 @@
+// Swift-facing adapter for the native BLAKE3 and xxHash implementations.
 #ifndef HASH_NATIVE_H
 #define HASH_NATIVE_H
 

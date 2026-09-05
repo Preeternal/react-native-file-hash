@@ -1,3 +1,4 @@
+// C ABI helpers for the Zig engine. The core lives in third_party.
 #import "FileHashZigHelpers.h"
 
 #if defined(ZFH_ENGINE_ZIG) && ZFH_ENGINE_ZIG == 1

@@ -107,10 +107,10 @@ function sourceFiles(engine) {
     return engine === 'zig'
         ? [
               ...common,
-              'FileHashBridgeZig.h',
-              'FileHashBridgeZig.mm',
-              'FileHashZigHelpers.h',
-              'FileHashZigHelpers.mm',
+              'Engines/Zig/FileHashBridgeZig.h',
+              'Engines/Zig/FileHashBridgeZig.mm',
+              'Engines/Zig/FileHashZigHelpers.h',
+              'Engines/Zig/FileHashZigHelpers.mm',
           ]
         : [
               ...common,
@@ -148,19 +148,19 @@ function renderManifest({
         engine === 'native'
             ? `    .target(
       name: "FileHashNativeCore",
-      path: "root/ios/NativeCore",
+      path: "root/ios/Engines/Native/Core",
       publicHeadersPath: ".",
       cSettings: [
-        .headerSearchPath("../../third_party/xxhash"),
-        .headerSearchPath("../../third_party/blake3/c"),
+        .headerSearchPath("../../../../third_party/xxhash"),
+        .headerSearchPath("../../../../third_party/blake3/c"),
         .define("BLAKE3_NO_SSE2", to: "1"),
         .define("BLAKE3_NO_SSE41", to: "1"),
         .define("BLAKE3_NO_AVX2", to: "1"),
         .define("BLAKE3_NO_AVX512", to: "1"),
       ],
       cxxSettings: [
-        .headerSearchPath("../../third_party/xxhash"),
-        .headerSearchPath("../../third_party/blake3/c"),
+        .headerSearchPath("../../../../third_party/xxhash"),
+        .headerSearchPath("../../../../third_party/blake3/c"),
         .define("BLAKE3_NO_SSE2", to: "1"),
         .define("BLAKE3_NO_SSE41", to: "1"),
         .define("BLAKE3_NO_AVX2", to: "1"),
@@ -170,7 +170,7 @@ function renderManifest({
     .target(
       name: "FileHashNative",
       dependencies: ["FileHashNativeCore"] + reactHeaders,
-      path: "root/ios/NativeSwift",
+      path: "root/ios/Engines/Native/Swift",
       linkerSettings: [
         .linkedFramework("CryptoKit"),
         .linkedFramework("Foundation"),
@@ -181,6 +181,8 @@ function renderManifest({
             : '';
     const engineDependency =
         engine === 'zig' ? '"ZigFilesHash"' : '"FileHashNative"';
+    const zigHeaderSearchPath =
+        engine === 'zig' ? '        .headerSearchPath("Engines/Zig"),\n' : '';
     const zigDefine =
         engine === 'zig' ? '        .define("ZFH_ENGINE_ZIG", to: "1"),\n' : '';
     const zigVersionDefine =
@@ -219,7 +221,7 @@ ${selectedSources}
       cSettings: [
         .headerSearchPath("ReactNative"),
         .headerSearchPath("."),
-${zigDefine}${zigVersionDefine}      ],
+${zigHeaderSearchPath}${zigDefine}${zigVersionDefine}      ],
       cxxSettings: [
         .headerSearchPath("ReactNative"),
         .headerSearchPath("."),
@@ -234,7 +236,7 @@ ${zigDefine}${zigVersionDefine}      ],
           "-DRN_FABRIC_ENABLED",
           "-fno-modules",
         ]),
-${zigDefine}${zigVersionDefine}        .define("DEBUG", .when(configuration: .debug)),
+${zigHeaderSearchPath}${zigDefine}${zigVersionDefine}        .define("DEBUG", .when(configuration: .debug)),
         .define("NDEBUG", .when(configuration: .release)),
       ],
       linkerSettings: [

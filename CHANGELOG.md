@@ -22,7 +22,8 @@
   the build-time `ZFH_ENGINE` setting.
 - Updated `@react-native-documents/picker` to v12.0.2 in example and patched its SwiftPM
   manifest.
-- Moved the iOS Swift, C/C++, and React Native sources into separate directories.
+- Grouped the project-owned iOS engine adapters under `ios/Engines/Native` and
+  `ios/Engines/Zig`. The upstream implementations remain under `third_party`.
 - Removed the old iOS bridge registration. `FileHash` is now registered through
   its generated TurboModule spec.
 - Android now relies solely on the generated `NativeFileHashSpec` methods.

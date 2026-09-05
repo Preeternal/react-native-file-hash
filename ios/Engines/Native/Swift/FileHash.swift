@@ -1,3 +1,4 @@
+// Native Apple engine implementation. BLAKE3 and xxHash live in third_party.
 import Foundation
 import CryptoKit
 import CommonCrypto
@@ -66,9 +67,8 @@ public class FileHashImpl: NSObject {
         work: @escaping (Operation) -> Void
     ) {
         let operation = BlockOperation()
-        weak var weakOperation = operation
-        operation.addExecutionBlock {
-            guard let activeOperation = weakOperation else { return }
+        operation.addExecutionBlock { [weak operation] in
+            guard let activeOperation = operation else { return }
             work(activeOperation)
         }
 

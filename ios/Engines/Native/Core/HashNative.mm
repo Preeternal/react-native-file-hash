@@ -1,3 +1,4 @@
+// Swift-facing adapter for BLAKE3 and xxHash; their sources live in third_party.
 #import "HashNative.h"
 #import "xxhash.h"
 #import "blake3.h"

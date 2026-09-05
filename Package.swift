@@ -17,26 +17,26 @@ let package = Package(
   ],
   dependencies: [
     // These paths are supplied by React Native's SPM autolinker under
-    // ios/build/generated/autolinking/libs/ReactNativeFileHash.
+    // ios/build/generated/autolinking/plugins/ReactNativeFileHash.
     .package(name: "ReactNative", path: "../../../../xcframeworks"),
     .package(name: "React-GeneratedCode", path: "../../../ios"),
   ],
   targets: [
     .target(
       name: "FileHashNativeCore",
-      path: "ios/NativeCore",
+      path: "ios/Engines/Native/Core",
       publicHeadersPath: ".",
       cSettings: [
-        .headerSearchPath("../../third_party/xxhash"),
-        .headerSearchPath("../../third_party/blake3/c"),
+        .headerSearchPath("../../../../third_party/xxhash"),
+        .headerSearchPath("../../../../third_party/blake3/c"),
         .define("BLAKE3_NO_SSE2", to: "1"),
         .define("BLAKE3_NO_SSE41", to: "1"),
         .define("BLAKE3_NO_AVX2", to: "1"),
         .define("BLAKE3_NO_AVX512", to: "1"),
       ],
       cxxSettings: [
-        .headerSearchPath("../../third_party/xxhash"),
-        .headerSearchPath("../../third_party/blake3/c"),
+        .headerSearchPath("../../../../third_party/xxhash"),
+        .headerSearchPath("../../../../third_party/blake3/c"),
         .define("BLAKE3_NO_SSE2", to: "1"),
         .define("BLAKE3_NO_SSE41", to: "1"),
         .define("BLAKE3_NO_AVX2", to: "1"),
@@ -46,7 +46,7 @@ let package = Package(
     .target(
       name: "FileHashNative",
       dependencies: ["FileHashNativeCore"] + reactHeaders,
-      path: "ios/NativeSwift",
+      path: "ios/Engines/Native/Swift",
       linkerSettings: [
         .linkedFramework("CryptoKit"),
         .linkedFramework("Foundation"),
