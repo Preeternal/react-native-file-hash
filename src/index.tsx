@@ -100,7 +100,6 @@ const isHmacAlgorithm = (
 const isXxh3Algorithm = (algorithm: THashAlgorithm): boolean =>
     algorithm === 'XXH3-64' || algorithm === 'XXH3-128';
 
-let didWarnHashStringDeprecation = false;
 let nextOperationId = 0;
 
 const createInvalidArgumentError = (message: string): InvalidArgumentError => {
@@ -297,20 +296,6 @@ const runWithAbortSignal = async <T,>(
     }
 };
 
-const warnHashStringDeprecationOnce = (): void => {
-    if (didWarnHashStringDeprecation) return;
-
-    const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
-    if (!isDev) return;
-
-    didWarnHashStringDeprecation = true;
-    if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-        console.warn(
-            '`hashString` is deprecated and will be removed in a future release. Use `stringHash`.'
-        );
-    }
-};
-
 const validateAndNormalizeOptions = (
     algorithm: THashAlgorithm,
     options?: HashOptions
@@ -394,59 +379,6 @@ const normalizeRuntimeDiagnostics = (
 const isRequestObject = (value: unknown): value is HashRequest =>
     value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const normalizeFileHashRequest = (
-    algorithmOrRequest?: THashAlgorithm | HashRequest,
-    options?: HashOptions
-): Required<Pick<HashRequest, 'algorithm'>> &
-    Pick<HashRequest, 'hashOptions' | 'signal' | 'mmap'> => {
-    if (isRequestObject(algorithmOrRequest)) {
-        return {
-            algorithm: algorithmOrRequest.algorithm ?? DEFAULT_ALGORITHM,
-            hashOptions: algorithmOrRequest.hashOptions,
-            signal: algorithmOrRequest.signal,
-            mmap: algorithmOrRequest.mmap,
-        };
-    }
-
-    return {
-        algorithm: algorithmOrRequest ?? DEFAULT_ALGORITHM,
-        hashOptions: options,
-        signal: undefined,
-        mmap: undefined,
-    };
-};
-
-const normalizeStringHashRequest = (
-    algorithmOrRequest?: THashAlgorithm | StringHashRequest,
-    encoding?: THashEncoding,
-    options?: HashOptions
-): Required<Pick<StringHashRequest, 'algorithm' | 'encoding'>> &
-    Pick<StringHashRequest, 'hashOptions' | 'signal'> => {
-    if (isRequestObject(algorithmOrRequest)) {
-        const request = algorithmOrRequest as StringHashRequest;
-        if ((request as { mmap?: unknown }).mmap !== undefined) {
-            throw createInvalidArgumentError(
-                '`mmap` is only supported by fileHash.'
-            );
-        }
-        return {
-            algorithm: request.algorithm ?? DEFAULT_ALGORITHM,
-            encoding: request.encoding ?? 'utf8',
-            hashOptions: request.hashOptions,
-            signal: request.signal,
-        };
-    }
-
-    return {
-        algorithm:
-            (algorithmOrRequest as THashAlgorithm | undefined) ??
-            DEFAULT_ALGORITHM,
-        encoding: encoding ?? 'utf8',
-        hashOptions: options,
-        signal: undefined,
-    };
-};
-
 const nativeFileHash = (
     filePath: string,
     algorithm: THashAlgorithm,
@@ -475,31 +407,27 @@ const nativeStringHash = (
  * Output format is fixed: lowercase hex string.
  * @returns A promise that resolves with a lowercase hex digest string.
  */
-export function fileHash(
-    filePath: string,
-    request?: HashRequest
-): Promise<string>;
-/**
- * @deprecated Use object-style request: fileHash(filePath, { algorithm, hashOptions, signal, mmap }).
- */
-export function fileHash(
-    filePath: string,
-    algorithm?: THashAlgorithm,
-    options?: HashOptions
-): Promise<string>;
 export async function fileHash(
     filePath: string,
-    algorithmOrRequest?: THashAlgorithm | HashRequest,
-    options?: HashOptions
+    request?: HashRequest
 ): Promise<string> {
-    const request = normalizeFileHashRequest(algorithmOrRequest, options);
+    if (
+        arguments.length > 2 ||
+        (request !== undefined && !isRequestObject(request))
+    ) {
+        throw createInvalidArgumentError(
+            '`fileHash` expects a request object as its second argument.'
+        );
+    }
+
+    const algorithm = request?.algorithm ?? DEFAULT_ALGORITHM;
     const normalized = {
-        ...validateAndNormalizeOptions(request.algorithm, request.hashOptions),
-        ...validateAndNormalizeMmap(request.mmap),
+        ...validateAndNormalizeOptions(algorithm, request?.hashOptions),
+        ...validateAndNormalizeMmap(request?.mmap),
     };
 
-    return runWithAbortSignal(request.signal, (operationId) =>
-        nativeFileHash(filePath, request.algorithm, normalized, operationId)
+    return runWithAbortSignal(request?.signal, (operationId) =>
+        nativeFileHash(filePath, algorithm, normalized, operationId)
     );
 }
 
@@ -510,57 +438,34 @@ export async function fileHash(
  * Output format is fixed: lowercase hex string.
  * @returns A promise that resolves with a lowercase hex digest string.
  */
-export function stringHash(
-    text: string,
-    request?: StringHashRequest
-): Promise<string>;
-/**
- * @deprecated Use object-style request: stringHash(text, { algorithm, encoding, hashOptions, signal }).
- */
-export function stringHash(
-    text: string,
-    algorithm?: THashAlgorithm,
-    encoding?: THashEncoding,
-    options?: HashOptions
-): Promise<string>;
 export async function stringHash(
     text: string,
-    algorithmOrRequest?: THashAlgorithm | StringHashRequest,
-    encoding?: THashEncoding,
-    options?: HashOptions
+    request?: StringHashRequest
 ): Promise<string> {
-    const request = normalizeStringHashRequest(
-        algorithmOrRequest,
-        encoding,
-        options
-    );
+    if (
+        arguments.length > 2 ||
+        (request !== undefined && !isRequestObject(request))
+    ) {
+        throw createInvalidArgumentError(
+            '`stringHash` expects a request object as its second argument.'
+        );
+    }
+    if ((request as { mmap?: unknown } | undefined)?.mmap !== undefined) {
+        throw createInvalidArgumentError(
+            '`mmap` is only supported by fileHash.'
+        );
+    }
+
+    const algorithm = request?.algorithm ?? DEFAULT_ALGORITHM;
+    const encoding = request?.encoding ?? 'utf8';
     const normalized = validateAndNormalizeOptions(
-        request.algorithm,
-        request.hashOptions
+        algorithm,
+        request?.hashOptions
     );
 
-    return runWithAbortSignal(request.signal, (operationId) =>
-        nativeStringHash(
-            text,
-            request.algorithm,
-            request.encoding,
-            normalized,
-            operationId
-        )
+    return runWithAbortSignal(request?.signal, (operationId) =>
+        nativeStringHash(text, algorithm, encoding, normalized, operationId)
     );
-}
-
-/**
- * @deprecated Use `stringHash` instead.
- */
-export function hashString(
-    text: string,
-    algorithm: THashAlgorithm = 'SHA-256',
-    encoding: THashEncoding = 'utf8',
-    options?: HashOptions
-): Promise<string> {
-    warnHashStringDeprecationOnce();
-    return stringHash(text, algorithm, encoding, options);
 }
 
 /**

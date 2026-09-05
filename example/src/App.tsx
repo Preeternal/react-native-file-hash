@@ -24,7 +24,6 @@ import {
     Alert,
     Clipboard,
     KeyboardAvoidingView,
-    NativeModules,
     Platform,
     Pressable,
     ScrollView,
@@ -35,6 +34,7 @@ import {
     useColorScheme,
     View,
 } from 'react-native';
+import BenchmarkFile from './NativeBenchmarkFile';
 
 type PickedFile = {
     name: string;
@@ -82,11 +82,6 @@ const benchmarkAlgorithms: THashAlgorithm[] = [
     'XXH3-64',
 ];
 
-type BenchmarkFileModule = {
-    createFile(sizeBytes: number): Promise<string>;
-    log?(message: string): void;
-};
-
 type BenchmarkAlgorithmResult = {
     algorithm: THashAlgorithm;
     samplesMs: number[];
@@ -98,10 +93,6 @@ type BenchmarkAlgorithmResult = {
 };
 
 type Xxh3SeedInputMode = 'label' | 'string' | 'number' | 'bigint';
-
-const BenchmarkFile = NativeModules.BenchmarkFile as
-    | BenchmarkFileModule
-    | undefined;
 
 const xxh3SeedInputModes: Xxh3SeedInputMode[] = [
     'label',
@@ -479,14 +470,6 @@ function AppContent() {
     };
 
     const runBenchmark = async () => {
-        if (!BenchmarkFile?.createFile) {
-            Alert.alert(
-                'Benchmark helper is unavailable',
-                'Rebuild the native example app first.'
-            );
-            return;
-        }
-
         const sizeMb = parseBoundedInt(benchmarkSizeMb, 200, 1, 4096);
         const samples = parseBoundedInt(benchmarkSamples, 3, 1, 20);
         const warmups = parseBoundedInt(benchmarkWarmups, 1, 0, 5);
@@ -581,17 +564,17 @@ function AppContent() {
             };
             const line = `ZFH_BENCHMARK_RESULT ${JSON.stringify(payload)}`;
             console.log(line);
-            BenchmarkFile.log?.(line);
+            BenchmarkFile.log(line);
             setBenchmarkStatus('Benchmark complete');
         } catch (error: any) {
             if (isAbortError(error) || controller.signal.aborted) {
                 setBenchmarkStatus('Benchmark cancelled');
-                BenchmarkFile.log?.('ZFH_BENCHMARK_CANCELLED');
+                BenchmarkFile.log('ZFH_BENCHMARK_CANCELLED');
                 return;
             }
 
             console.warn('Benchmark failed', error);
-            BenchmarkFile.log?.(
+            BenchmarkFile.log(
                 `ZFH_BENCHMARK_FAILED ${error?.message ?? 'Unknown error'}`
             );
             setBenchmarkStatus('Benchmark failed');

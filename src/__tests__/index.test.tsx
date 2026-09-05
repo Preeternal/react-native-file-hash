@@ -132,6 +132,28 @@ describe('fileHash options validation', () => {
         );
     });
 
+    it('rejects removed positional fileHash calls', async () => {
+        await expect(fileHash('path', 'SHA-512' as any)).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.fileHash).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed fileHash options after an omitted algorithm', async () => {
+        const positionalFileHash = fileHash as (
+            ...args: unknown[]
+        ) => Promise<string>;
+
+        await expect(
+            positionalFileHash('path', undefined, {})
+        ).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.fileHash).not.toHaveBeenCalled();
+    });
+
     it('requires key for HMAC algorithms', async () => {
         await expect(
             fileHash('p', { algorithm: 'HMAC-SHA-256' })
@@ -327,7 +349,7 @@ describe('fileHash options validation', () => {
         ['hex string above u64', '0x10000000000000000', /unsigned 64-bit/],
     ] as const)(
         'rejects invalid XXH3 seed: %s',
-        async (_label, seed, error) => {
+        async (...[_label, seed, error]) => {
             await expect(
                 fileHash('p', {
                     algorithm: 'XXH3-64',
@@ -354,6 +376,30 @@ describe('stringHash mirrors validation', () => {
             {},
             undefined
         );
+    });
+
+    it('rejects removed positional stringHash calls', async () => {
+        await expect(stringHash('abc', 'SHA-512' as any)).rejects.toMatchObject(
+            {
+                code: 'E_INVALID_ARGUMENT',
+                message: expect.stringContaining('expects a request object'),
+            }
+        );
+        expect(FileHash.stringHash).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed string encoding after an omitted algorithm', async () => {
+        const positionalStringHash = stringHash as (
+            ...args: unknown[]
+        ) => Promise<string>;
+
+        await expect(
+            positionalStringHash('YWJj', undefined, 'base64')
+        ).rejects.toMatchObject({
+            code: 'E_INVALID_ARGUMENT',
+            message: expect.stringContaining('expects a request object'),
+        });
+        expect(FileHash.stringHash).not.toHaveBeenCalled();
     });
 
     it('rejects missing key for HMAC algorithm', async () => {
@@ -562,8 +608,7 @@ describe('HashRequest object API and cancellation', () => {
     it('cancels native operation when signal aborts during file hash', async () => {
         const controller = createMockAbortController();
         let rejectNative:
-            | ((error: Error & { code: string }) => void)
-            | undefined;
+            ((error: Error & { code: string }) => void) | undefined;
         mockedFileHash.mockImplementationOnce(
             async () =>
                 new Promise<string>((_resolve, reject) => {

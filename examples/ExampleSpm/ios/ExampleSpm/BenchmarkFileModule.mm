@@ -1,0 +1,105 @@
+#import <Foundation/Foundation.h>
+#import <ExampleSpmSpec/ExampleSpmSpec.h>
+
+static const NSUInteger ZFHBenchmarkChunkSize = 1024 * 1024;
+
+@interface BenchmarkFileModule : NSObject <NativeBenchmarkFileSpec>
+@end
+
+@implementation BenchmarkFileModule
+
+- (void)createFile:(double)sizeBytes
+            resolve:(RCTPromiseResolveBlock)resolve
+             reject:(RCTPromiseRejectBlock)reject
+{
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+    long long requestedSize = (long long)sizeBytes;
+    if (requestedSize <= 0) {
+      reject(@"E_INVALID_SIZE", @"Benchmark file size must be positive", nil);
+      return;
+    }
+
+    NSFileManager *fileManager = NSFileManager.defaultManager;
+    NSURL *cacheURL = [fileManager URLsForDirectory:NSCachesDirectory
+                                          inDomains:NSUserDomainMask].firstObject;
+    NSURL *directoryURL = [cacheURL URLByAppendingPathComponent:@"zfh-benchmark"
+                                                    isDirectory:YES];
+
+    NSError *error = nil;
+    if (![fileManager createDirectoryAtURL:directoryURL
+               withIntermediateDirectories:YES
+                                attributes:nil
+                                     error:&error]) {
+      reject(@"E_CREATE_DIR", @"Failed to create benchmark cache directory", error);
+      return;
+    }
+
+    NSString *fileName = [NSString stringWithFormat:@"payload-%lld.bin", requestedSize];
+    NSURL *fileURL = [directoryURL URLByAppendingPathComponent:fileName];
+    NSDictionary<NSFileAttributeKey, id> *attributes =
+        [fileManager attributesOfItemAtPath:fileURL.path error:nil];
+    if ([attributes[NSFileSize] unsignedLongLongValue] == (unsigned long long)requestedSize) {
+      resolve(fileURL.path);
+      return;
+    }
+
+    if ([fileManager fileExistsAtPath:fileURL.path] &&
+        ![fileManager removeItemAtURL:fileURL error:&error]) {
+      reject(@"E_DELETE_FILE", @"Failed to replace benchmark file", error);
+      return;
+    }
+
+    if (![fileManager createFileAtPath:fileURL.path contents:nil attributes:nil]) {
+      reject(@"E_CREATE_FILE", @"Failed to create benchmark file", nil);
+      return;
+    }
+
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingToURL:fileURL error:&error];
+    if (handle == nil) {
+      reject(@"E_OPEN_FILE", @"Failed to open benchmark file", error);
+      return;
+    }
+
+    NSMutableData *chunk = [NSMutableData dataWithLength:ZFHBenchmarkChunkSize];
+    uint8_t *bytes = static_cast<uint8_t *>(chunk.mutableBytes);
+    for (NSUInteger i = 0; i < ZFHBenchmarkChunkSize; i += 1) {
+      bytes[i] = (uint8_t)(i & 0xff);
+    }
+
+    long long remaining = requestedSize;
+    while (remaining > 0) {
+      @autoreleasepool {
+        NSUInteger count =
+            (NSUInteger)((remaining < (long long)ZFHBenchmarkChunkSize)
+                             ? remaining
+                             : (long long)ZFHBenchmarkChunkSize);
+        [handle writeData:count == ZFHBenchmarkChunkSize
+                            ? chunk
+                            : [chunk subdataWithRange:NSMakeRange(0, count)]];
+        remaining -= (long long)count;
+      }
+    }
+
+    [handle synchronizeFile];
+    [handle closeFile];
+    resolve(fileURL.path);
+  });
+}
+
+- (void)log:(NSString *)message
+{
+  NSLog(@"%@", message);
+}
+
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params
+{
+  return std::make_shared<facebook::react::NativeBenchmarkFileSpecJSI>(params);
+}
+
++ (NSString *)moduleName
+{
+  return @"BenchmarkFile";
+}
+
+@end

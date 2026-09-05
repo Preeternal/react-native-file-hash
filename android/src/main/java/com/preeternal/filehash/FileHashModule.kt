@@ -4,7 +4,6 @@ import android.util.Base64
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.module.annotations.ReactModule
@@ -45,7 +44,6 @@ class FileHashModule(
 
     override fun getName(): String = NAME
 
-    @ReactMethod
     override fun getRuntimeInfo(promise: Promise) {
         try {
             val info = Arguments.createMap()
@@ -56,7 +54,6 @@ class FileHashModule(
         }
     }
 
-    @ReactMethod
     override fun getRuntimeDiagnostics(promise: Promise) {
         try {
             val info = Arguments.createMap()
@@ -212,7 +209,6 @@ class FileHashModule(
         }
     }
 
-    @ReactMethod
     override fun fileHash(
         filePath: String,
         algorithm: String,
@@ -251,7 +247,6 @@ class FileHashModule(
         }
     }
 
-    @ReactMethod
     override fun stringHash(
         text: String,
         algorithm: String,
@@ -300,7 +295,6 @@ class FileHashModule(
         }
     }
 
-    @ReactMethod
     override fun cancelOperation(operationId: String) {
         if (operationId.isBlank()) return
 

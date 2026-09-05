@@ -6,6 +6,8 @@ ws_dir = ws_dir.parent until
   ws_dir.expand_path.to_s == '/'
 require "#{ws_dir}/node_modules/react-native-macos/scripts/react_native_pods.rb"
 
+ENV['RCT_NEW_ARCH_ENABLED'] = '1'
+
 prepare_react_native_project!
 
 target 'FileHashMacOSExample-macOS' do
@@ -14,7 +16,7 @@ target 'FileHashMacOSExample-macOS' do
 
   use_react_native!(
     :path => '../node_modules/react-native-macos',
-    :fabric_enabled => ENV['RCT_NEW_ARCH_ENABLED'] == '1',
+    :fabric_enabled => true,
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )

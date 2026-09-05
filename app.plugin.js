@@ -9,7 +9,7 @@ try {
     }
     configPlugins = require('expo/config-plugins');
 }
-const { createRunOncePlugin, withPodfile } = configPlugins;
+const { createRunOncePlugin, withInfoPlist, withPodfile } = configPlugins;
 const withAndroidGradleProperties =
     typeof configPlugins.withAndroidGradleProperties === 'function'
         ? configPlugins.withAndroidGradleProperties
@@ -99,6 +99,13 @@ function updatePodfileContents(contents, engine) {
 }
 
 function setIosEngine(config, engine) {
+    config = withInfoPlist(config, (mod) => {
+        // Expo Prebuild currently uses CocoaPods on iOS. Keep this value in
+        // sync for React Native's SwiftPM selector; it does not enable SwiftPM.
+        mod.modResults.ZFHEngine = engine;
+        return mod;
+    });
+
     return withPodfile(config, (mod) => {
         mod.modResults.contents = updatePodfileContents(
             mod.modResults.contents,

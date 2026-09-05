@@ -1,5 +1,39 @@
 # Releases
 
+## v3.0.0 — SwiftPM support and New Architecture only
+
+### Breaking changes
+
+- Removed React Native Old Architecture support. `@preeternal/react-native-file-hash`
+  now requires the New Architecture and its TurboModule/codegen integration.
+- Removed the deprecated positional overloads for `fileHash` and `stringHash`.
+  Pass a request object as the second argument instead.
+- Removed the deprecated `hashString(...)` alias; use `stringHash(...)`.
+
+### Changed
+
+- Updated the library template to `create-react-native-library` `0.63.0`.
+- Added iOS SwiftPM support for React Native 0.87. CocoaPods remains the default.
+- Added the RN 0.87 `examples/ExampleSpm` app with a file picker and native
+  benchmark-file module.
+- SwiftPM selects one iOS engine at build time through React Native's SPM
+  autolinking plugin. Set `ZFHEngine=zig` in the app's Info.plist to compile and
+  link Zig; without the key it compiles and links only `native`. CocoaPods uses
+  the build-time `ZFH_ENGINE` setting.
+- Updated `@react-native-documents/picker` to v12.0.2 in example and patched its SwiftPM
+  manifest.
+- Grouped the project-owned iOS engine adapters under `ios/Engines/Native` and
+  `ios/Engines/Zig`. The upstream implementations remain under `third_party`.
+- Removed the old iOS bridge registration. `FileHash` is now registered through
+  its generated TurboModule spec.
+- Android now relies solely on the generated `NativeFileHashSpec` methods.
+
+### Fixed
+
+- Android: Fix a Kotlin plugin conflict when building with AGP 9’s built-in Kotlin support enabled, while preserving compatibility with AGP 8.
+
+---
+
 ## v2.0.8 - Zig fd/path hashing and mmap request hint
 
 ### Added

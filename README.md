@@ -6,6 +6,10 @@ BLAKE3.
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 
+> Starting with `v3.0.0`, this package supports only React Native's New
+> Architecture. Projects that still require the legacy bridge should stay on
+> `v2.x`.
+
 Use it when your app needs to verify large downloads, fingerprint media,
 deduplicate local files or cached uploads, generate fast cache keys, compare
 local content, or authenticate data with HMAC or keyed BLAKE3.
@@ -60,14 +64,39 @@ or:
 bun add @preeternal/react-native-file-hash
 ```
 
-React Native 0.60+ autolinks the native module.
+React Native autolinks the native module.
 
-For iOS, install pods:
+### iOS installation
+
+#### CocoaPods (default)
+
+CocoaPods remains the default. Existing apps and React Native versions before
+0.87 install the library normally:
+
+```bash
+cd ios && bundle exec pod install && cd ..
+```
+
+#### Swift Package Manager (React Native 0.87+)
+
+React Native 0.87 added experimental, opt-in SwiftPM integration. To migrate an
+app once:
 
 ```bash
 cd ios
-bundle exec pod install
+npx react-native spm --deintegrate
 ```
+
+After a fresh clone or in CI, generate the SwiftPM workspace before building:
+
+```bash
+cd ios
+npx react-native spm
+```
+
+Every native dependency must have a compatible `Package.swift`. If a dependency
+does not provide one, generate it with `npx react-native spm scaffold` and keep
+the manifest in a package-manager patch.
 
 ### Expo
 
@@ -292,6 +321,7 @@ type HashRequest = {
   algorithm?: THashAlgorithm;
   hashOptions?: HashOptions;
   signal?: HashAbortSignal;
+  mmap?: boolean;
 };
 
 type StringHashRequest = {
@@ -310,25 +340,6 @@ type HashOptions = {
 
 The exported `HashAbortSignal` type is intentionally compatible with
 `AbortController.signal`.
-
-### Deprecated Call Forms
-
-The positional overloads still work, but the object-style request API is the
-recommended form because it avoids placeholder arguments and supports
-cancellation cleanly.
-
-```ts
-// Deprecated, still supported for migration.
-await fileHash(fileUri, 'SHA-256');
-await stringHash('hello', 'SHA-256', 'utf8');
-
-// Recommended.
-await fileHash(fileUri, { algorithm: 'SHA-256' });
-await stringHash('hello', { algorithm: 'SHA-256', encoding: 'utf8' });
-```
-
-`hashString(...)` is a deprecated alias for `stringHash(...)` and will be
-removed in a future major release.
 
 ## Algorithms
 
@@ -400,17 +411,16 @@ selected. For the default native engine, consumers usually do not need it.
 
 ## Optional: Engine Selection
 
-This library ships with two build-time engines:
+The library has two hashing engines:
 
 - `native`: the default engine, recommended for most apps.
 - `zig`: an optional engine built on the bundled
   [`zig-files-hash`](https://github.com/Preeternal/zig-files-hash) core.
 
-The `native` engine uses platform implementations plus native C for BLAKE3 and
-XXH3. The `zig` engine can be useful when you want one portable hashing core
-shared across bindings, when you want to validate behavior against the Zig
-implementation, or when current benchmarks favor Zig for the algorithms you
-use. See [BENCHMARKS.md](./BENCHMARKS.md) for the latest engine comparison.
+The `native` engine uses platform APIs and native C implementations of BLAKE3
+and XXH3. Choose `zig` if you need the same hashing core across platforms or if
+it performs better for your workload. See [BENCHMARKS.md](./BENCHMARKS.md) for
+current measurements.
 
 ### Zig File Routing
 
@@ -441,8 +451,8 @@ that can terminate the process with `SIGBUS`.
 Package users do not need a local Zig toolchain; release artifacts include Zig
 prebuilts.
 
-The selected engine is resolved at build time. The unused engine is not linked
-into the final native binary.
+Android, CocoaPods, and SwiftPM select the engine at build time and do not link
+the other engine.
 
 ### Android
 
@@ -458,7 +468,7 @@ Android Zig currently routes `SHA-224`, `SHA-256`, `HMAC-SHA-224`, and
 `HMAC-SHA-256` through the native pipeline in the shipped generic prebuilt
 setup to avoid ARM SHA-2 latency cliffs.
 
-### iOS
+### iOS with CocoaPods
 
 Set this in your app's `ios/Podfile` before `pod install`:
 
@@ -467,6 +477,28 @@ ENV['ZFH_ENGINE'] ||= 'zig'
 ```
 
 If `ZFH_ENGINE` is omitted, `native` is used.
+
+### iOS with SwiftPM
+
+SwiftPM compiles and links exactly one engine. React Native's SPM autolinking
+plugin reads `ZFHEngine` from the app's `Info.plist` when it generates the
+package; if the key is absent, `native` is used.
+
+To select Zig in a bare React Native app, add:
+
+```xml
+<key>ZFHEngine</key>
+<string>zig</string>
+```
+
+Use `<string>native</string>` or remove the key to select the default engine.
+Because this changes the SwiftPM dependency graph, run
+`npx react-native spm` before building to guarantee that the very next build uses
+the selected engine. In an app where SwiftPM is already set up, this updates the
+existing integration. Xcode's SPM auto-sync also watches existing `Info.plist`
+files, but Xcode can resolve the old package graph before the sync pre-action
+runs; in that case the automatically detected change takes effect on the
+following build. The generated package contains only the selected core.
 
 ### macOS
 
@@ -490,6 +522,11 @@ example and platform-specific setup notes.
   }
 }
 ```
+
+The Expo plugin sets the Android Gradle property and CocoaPods' `ZFH_ENGINE`.
+It also mirrors the selected engine to `ZFHEngine` in `Info.plist`, but Expo
+Prebuild currently uses CocoaPods on iOS. This key does not enable SwiftPM; it
+is kept for forward compatibility with React Native's SwiftPM selector.
 
 If `engine` is omitted, `native` is used.
 
