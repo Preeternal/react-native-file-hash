@@ -1,6 +1,6 @@
 # Releases
 
-## v3.0.0 (нерелижено) — SwiftPM support and New Architecture only
+## v3.0.0 — SwiftPM support and New Architecture only
 
 ### Breaking changes
 
