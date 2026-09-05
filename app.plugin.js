@@ -100,8 +100,8 @@ function updatePodfileContents(contents, engine) {
 
 function setIosEngine(config, engine) {
     config = withInfoPlist(config, (mod) => {
-        // SwiftPM's autolinking plugin compiles only the engine selected here.
-        // no key means native, matching the CocoaPods default.
+        // Expo Prebuild currently uses CocoaPods on iOS. Keep this value in
+        // sync for React Native's SwiftPM selector; it does not enable SwiftPM.
         mod.modResults.ZFHEngine = engine;
         return mod;
     });

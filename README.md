@@ -523,8 +523,10 @@ example and platform-specific setup notes.
 }
 ```
 
-The Expo plugin writes the Android Gradle property, CocoaPods' `ZFH_ENGINE`, and
-the `ZFHEngine` value used by SwiftPM.
+The Expo plugin sets the Android Gradle property and CocoaPods' `ZFH_ENGINE`.
+It also mirrors the selected engine to `ZFHEngine` in `Info.plist`, but Expo
+Prebuild currently uses CocoaPods on iOS. This key does not enable SwiftPM; it
+is kept for forward compatibility with React Native's SwiftPM selector.
 
 If `engine` is omitted, `native` is used.
 
