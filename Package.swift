@@ -87,6 +87,8 @@ let package = Package(
         ]),
         .define("DEBUG", .when(configuration: .debug)),
         .define("NDEBUG", .when(configuration: .release)),
+        .define("RCT_NEW_ARCH_ENABLED", to: "1"),
+        .define("RCT_REMOVE_LEGACY_ARCH", to: "1"),
       ],
       linkerSettings: [
         .linkedFramework("Foundation"),

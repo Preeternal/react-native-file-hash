@@ -482,15 +482,6 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-react-native-spm-
 
-            - name: Generate the podless SwiftPM project
-              run: |
-                  yarn example:spm spm:setup
-                  test ! -d examples/ExampleSpm/ios/Pods
-
-            - name: Verify benchmark TurboModule registration
-              run: |
-                  grep -q '@"BenchmarkFile": @"BenchmarkFileModule"' examples/ExampleSpm/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.mm
-
             - name: Build RN 0.87 example for iOS with SwiftPM
               run: |
                   IOS_BUILD_LOG="$RUNNER_TEMP/ios-spm-rn87-build.log"
@@ -498,6 +489,11 @@ jobs:
                     grep -n -m 30 -E 'error:|fatal error:' "$IOS_BUILD_LOG" || true
                     exit 1
                   fi
+
+            - name: Verify podless integration and benchmark registration
+              run: |
+                  test ! -d examples/ExampleSpm/ios/Pods
+                  grep -q '@"BenchmarkFile": @"BenchmarkFileModule"' examples/ExampleSpm/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.mm
 
             - name: Upload SwiftPM build log
               if: always()

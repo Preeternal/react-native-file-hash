@@ -14,6 +14,7 @@ module.exports = {
         },
     },
     spm: {
+        name: 'ReactNativeFileHash',
         autolinkingPlugin: './scripts/spm-autolinking-plugin.js',
     },
 };
