@@ -31,5 +31,14 @@ target 'FileHashExample' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # RN 0.85 assumes that a prebuilt RNCore without this marker is Debug.
+    # A cached Release framework can arrive without the marker, so make the
+    # next Debug build select the matching prebuilt framework.
+    rncore_path = File.join(installer.sandbox.root.to_s, 'React-Core-prebuilt')
+    if File.directory?(rncore_path)
+      marker_path = File.join(rncore_path, '.last_build_configuration')
+      File.write(marker_path, 'Unconfigured') unless File.exist?(marker_path)
+    end
   end
 end

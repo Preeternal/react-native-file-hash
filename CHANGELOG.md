@@ -8,6 +8,8 @@
   compiler. SwiftPM updates remove that path if React Native adds it again.
 - The library's SwiftPM target now builds with the New Architecture settings
   required by React Native 0.87.
+- Fixed missing React Native C++ symbols in Debug builds of the CocoaPods
+  example when a cached RNCore framework has no build configuration marker.
 
 CocoaPods remains the default installation method. There are no API changes.
 
