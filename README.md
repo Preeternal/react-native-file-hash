@@ -1,11 +1,11 @@
 # @preeternal/react-native-file-hash
 
-Native streaming hashes for React Native files, strings, HMAC, XXH3, and
-BLAKE3.
-
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-file-hash.svg)](https://www.npmjs.com/package/@preeternal/react-native-file-hash)
 [![Patreon](https://img.shields.io/endpoint?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%2F%3Fusername%3Dpreeternal%26type%3Dpatrons)](https://www.patreon.com/preeternal)
+
+Native streaming hashes for React Native files, strings, HMAC, XXH3, and
+BLAKE3.
 
 > Starting with `v3.0.0`, this package supports only React Native's New
 > Architecture. Projects that still require the legacy bridge should stay on
