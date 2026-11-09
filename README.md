@@ -80,37 +80,30 @@ cd ios && bundle exec pod install && cd ..
 
 #### Swift Package Manager (React Native 0.87+)
 
-React Native 0.87 added experimental, opt-in SwiftPM integration. To migrate an
-existing CocoaPods app once, run this from the app's `ios` directory:
+React Native 0.87+ supports experimental, opt-in SwiftPM integration. To migrate
+an existing CocoaPods app, run this from the app's `ios` directory:
 
 ```bash
 bundle exec pod deintegrate
 npx react-native spm add --yes
 ```
 
-After a fresh clone or in CI, refresh the SwiftPM integration before building:
+After setup, or after changing the selected engine, refresh the integration:
 
 ```bash
-cd ios
 npx react-native spm update --yes
 ```
 
-Build the generated `.xcodeproj` directly (or open it in Xcode). Do not use
-`yarn ios` for an SPM-integrated project: the React Native CLI attempts to run
-CocoaPods first.
-
-To return to CocoaPods, remove the SwiftPM integration and install the pods
-again:
+To return to CocoaPods:
 
 ```bash
-cd ios
 npx react-native spm deinit
 bundle exec pod install
 ```
 
-This assumes the `Podfile` still contains the React Native integration. If the
-old `spm --deintegrate` flow was used and stripped it, restore the `Podfile`
-from version control before running `pod install`.
+The SPM commands update the native integration; the exact build/run command is
+project-specific. SPM projects build from the generated Xcode project rather
+than the CocoaPods workspace.
 
 Every native dependency must have a compatible `Package.swift`. If a dependency
 does not provide one, generate it with `npx react-native spm scaffold` and keep
