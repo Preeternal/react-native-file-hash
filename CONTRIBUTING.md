@@ -48,8 +48,8 @@ Prebuilt output locations:
 - `third_party/zig-files-hash-prebuilt/macos/ZigFilesHash.xcframework`
 - `third_party/zig-files-hash-prebuilt/windows/<Platform>/zig_files_hash.lib`
 
-The bundled Zig core is `zig-files-hash v0.0.6` with C ABI v3
-(`ZFH_API_VERSION = 3`). Custom source/prebuilt builds must use a compatible
+The bundled Zig core is `zig-files-hash v0.0.8` with C ABI v4
+(`ZFH_API_VERSION = 4`). Custom source/prebuilt builds must use a compatible
 Zig C ABI.
 
 ### Release builds on physical devices (native vs zig)

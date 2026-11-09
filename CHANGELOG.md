@@ -1,5 +1,17 @@
 # Releases
 
+## v3.0.2 — Unreleased
+
+### Changed
+
+- Updated the bundled Zig core to `zig-files-hash` `v0.0.8` / Zig `0.17.1`.
+- Removed the Apple static-library repacking workaround now that Zig emits correctly aligned Mach-O archives.
+- Updated Zig CI and platform metadata for the new core version.
+
+C ABI remains v4.
+
+---
+
 ## v3.0.1 — SwiftPM setup fixes
 
 - The React Native 0.87 example now refreshes SwiftPM packages whenever you
