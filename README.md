@@ -81,19 +81,36 @@ cd ios && bundle exec pod install && cd ..
 #### Swift Package Manager (React Native 0.87+)
 
 React Native 0.87 added experimental, opt-in SwiftPM integration. To migrate an
-app once:
+existing CocoaPods app once, run this from the app's `ios` directory:
+
+```bash
+bundle exec pod deintegrate
+npx react-native spm add --yes
+```
+
+After a fresh clone or in CI, refresh the SwiftPM integration before building:
 
 ```bash
 cd ios
-npx react-native spm --deintegrate
+npx react-native spm update --yes
 ```
 
-After a fresh clone or in CI, generate the SwiftPM workspace before building:
+Build the generated `.xcodeproj` directly (or open it in Xcode). Do not use
+`yarn ios` for an SPM-integrated project: the React Native CLI attempts to run
+CocoaPods first.
+
+To return to CocoaPods, remove the SwiftPM integration and install the pods
+again:
 
 ```bash
 cd ios
-npx react-native spm
+npx react-native spm deinit
+bundle exec pod install
 ```
+
+This assumes the `Podfile` still contains the React Native integration. If the
+old `spm --deintegrate` flow was used and stripped it, restore the `Podfile`
+from version control before running `pod install`.
 
 Every native dependency must have a compatible `Package.swift`. If a dependency
 does not provide one, generate it with `npx react-native spm scaffold` and keep
@@ -494,12 +511,13 @@ To select Zig in a bare React Native app, add:
 
 Use `<string>native</string>` or remove the key to select the default engine.
 Because this changes the SwiftPM dependency graph, run
-`npx react-native spm` before building to guarantee that the very next build uses
-the selected engine. In an app where SwiftPM is already set up, this updates the
-existing integration. Xcode's SPM auto-sync also watches existing `Info.plist`
-files, but Xcode can resolve the old package graph before the sync pre-action
-runs; in that case the automatically detected change takes effect on the
-following build. The generated package contains only the selected core.
+`npx react-native spm update --yes` before building to guarantee that the very
+next build uses the selected engine. In an app where SwiftPM is already set up,
+this updates the existing integration. Xcode's SPM auto-sync also watches
+existing `Info.plist` files, but Xcode can resolve the old package graph before
+the sync pre-action runs; in that case the automatically detected change takes
+effect on the following build. The generated package contains only the
+selected core.
 
 ### macOS
 

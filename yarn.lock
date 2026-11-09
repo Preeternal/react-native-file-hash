@@ -4719,11 +4719,11 @@ __metadata:
 
 "@react-native-documents/picker@patch:@react-native-documents/picker@npm%3A12.0.3#~/.yarn/patches/@react-native-documents-picker-npm-12.0.3-83a7a929fa.patch":
   version: 12.0.3
-  resolution: "@react-native-documents/picker@patch:@react-native-documents/picker@npm%3A12.0.3#~/.yarn/patches/@react-native-documents-picker-npm-12.0.3-83a7a929fa.patch::version=12.0.3&hash=94c9c3"
+  resolution: "@react-native-documents/picker@patch:@react-native-documents/picker@npm%3A12.0.3#~/.yarn/patches/@react-native-documents-picker-npm-12.0.3-83a7a929fa.patch::version=12.0.3&hash=f54f81"
   peerDependencies:
     react: "*"
     react-native: ">=0.79.0"
-  checksum: 10c0/1f64c94e392225a6c8bf7419a523ab58f8de7c9df4d7c0005f1fdd8a7d0dc2201687dd59e934230b3f1854e9c1cb0c5300eb71f87a16816f3e49d0821c0ffedc
+  checksum: 10c0/79b5f1c0d735a205607a441fcab4917d44830a0b9732fb9c33d907ee83b50ca1e127680e592bcc0bcdd0ef5712ea59d43ab38bb1f45bd773cc43028bd452b983
   languageName: node
   linkType: hard
 

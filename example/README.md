@@ -58,6 +58,51 @@ npm run ios
 yarn ios
 ```
 
+### Swift Package Manager
+
+React Native 0.87+ also supports the experimental Swift Package Manager
+integration. From this directory, run the one-time setup:
+
+```sh
+yarn spm:setup
+```
+
+Then refresh the generated SwiftPM package and build the example:
+
+```sh
+yarn build:ios:spm
+```
+
+To build, install, and launch it on a simulator from the terminal:
+
+```sh
+yarn run:ios:spm
+```
+
+Use another simulator name when needed:
+
+```sh
+IOS_SIMULATOR='iPhone 16e' yarn run:ios:spm
+```
+
+Keep Metro running with `yarn start`. The SPM build uses
+`ios/FileHashExample.xcodeproj` directly; do not use `yarn ios` for this mode,
+because the React Native CLI tries to install CocoaPods first.
+
+To return to CocoaPods, run:
+
+```sh
+cd ios
+npx react-native spm deinit
+bundle exec pod install
+cd ..
+yarn ios
+```
+
+This works with the setup above, which keeps the React Native integration in
+`Podfile`. If an older `spm --deintegrate` flow was used, restore `Podfile`
+from version control before running `pod install`.
+
 If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
 
 This is one way to run your app — you can also build it directly from Android Studio or Xcode.

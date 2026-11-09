@@ -1,3 +1,13 @@
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,3 +1,6 @@
+ {
+   "name": "@react-native-documents/picker",
++  "swiftpmConfig": {
++    "name": "Picker"
++  },
+   "version": "12.0.3",
 diff --git a/Package.swift b/Package.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3381059164fc8a31f0d976d09bc79713417743a

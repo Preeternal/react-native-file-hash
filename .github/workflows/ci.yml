@@ -460,7 +460,7 @@ jobs:
                   plutil -insert ZFHEngine -string "${{ matrix.engine }}" \
                     example/ios/FileHashExample/Info.plist
                   cd example
-                  bundle exec pod deintegrate --project-directory=ios
+                  bundle exec pod deintegrate ios/FileHashExample.xcodeproj
                   npx react-native spm add --yes
 
             - name: Build example for iOS with SwiftPM (${{ matrix.engine }})
