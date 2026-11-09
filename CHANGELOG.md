@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Updated the library and example template to React Native `0.88` / React `19.3`.
+- Removed the separate SwiftPM example; the main example retains SwiftPM support.
+- Updated example dependencies, including `@react-native-documents/picker` `12.0.3` and `react-native-safe-area-context` `5.11.1`.
 - Updated the bundled Zig core to `zig-files-hash` `v0.0.8` / Zig `0.17.1`.
 - Removed the Apple static-library repacking workaround now that Zig emits correctly aligned Mach-O archives.
 - Updated Zig CI and platform metadata for the new core version.

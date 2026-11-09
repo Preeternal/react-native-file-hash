@@ -28,6 +28,7 @@ export default defineConfig([
             'eslint.config.mjs',
             'node_modules/',
             'lib/',
+            'example/dist/',
             'coverage/',
             '.nyc_output/',
             'android/build/',
