@@ -8,21 +8,15 @@ internal final class FileHashOperationRegistry {
     func register(_ operation: Operation, id: String) {
         lock.lock()
         operationsById[id] = operation
-        let wasCancelled = cancelledOperationIds.remove(id) != nil
         lock.unlock()
-
-        if wasCancelled {
-            operation.cancel()
-        }
     }
 
     func cancel(id: String) {
         lock.lock()
         cancelledOperationIds.insert(id)
-        let operation = operationsById[id]
         lock.unlock()
-
-        operation?.cancel()
+        // Cancellation is cooperative: cancelling a queued BlockOperation would
+        // skip its work block, including the promise rejection in FileHashImpl.
     }
 
     func isCancelled(id: String) -> Bool {
