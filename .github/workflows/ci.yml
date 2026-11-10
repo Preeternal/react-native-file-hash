@@ -507,6 +507,9 @@ jobs:
             - name: Setup
               uses: ./.github/actions/setup
 
+            - name: Test smoke runner
+              run: node --test scripts/__tests__/run-macos-smoke.test.cjs
+
             - name: Use appropriate Xcode version
               uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
               with:
@@ -523,6 +526,9 @@ jobs:
               run: |
                   bundle install
                   bundle exec pod install --project-directory=macos
+
+            - name: Build package
+              run: yarn prepare
 
             - name: Build macOS Release smoke bundle
               working-directory: examples/macos/macos
@@ -547,28 +553,7 @@ jobs:
                   app_binary="$RUNNER_TEMP/file-hash-macos-derived/Build/Products/Release/FileHashMacOSExample.app/Contents/MacOS/FileHashMacOSExample"
                   smoke_log="$RUNNER_TEMP/macos-smoke.log"
 
-                  test -x "$app_binary"
-                  "$app_binary" --file-hash-smoke > "$smoke_log" 2>&1 &
-                  app_pid=$!
-
-                  for _ in {1..180}; do
-                      if grep -q 'FILE_HASH_MACOS_SMOKE_PASS' "$smoke_log"; then
-                          wait "$app_pid" || true
-                          exit 0
-                      fi
-
-                      if ! kill -0 "$app_pid" 2>/dev/null; then
-                          wait "$app_pid" || true
-                          cat "$smoke_log"
-                          exit 1
-                      fi
-
-                      sleep 1
-                  done
-
-                  kill "$app_pid" || true
-                  cat "$smoke_log"
-                  exit 1
+                  bash ../../../scripts/run-macos-smoke.sh "$app_binary" "$smoke_log"
 
             - name: Upload macOS diagnostics
               if: always()
