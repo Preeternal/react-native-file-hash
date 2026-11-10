@@ -85,8 +85,8 @@ public class FileHashImpl: NSObject {
             self.operationsLock.lock()
             if self.operationsById[trackedId] === operation {
                 self.operationsById.removeValue(forKey: trackedId)
+                self.cancelledOperationIds.remove(trackedId)
             }
-            self.cancelledOperationIds.remove(trackedId)
             self.operationsLock.unlock()
         }
 

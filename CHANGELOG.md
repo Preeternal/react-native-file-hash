@@ -14,6 +14,7 @@
 ### Fixed
 
 - Fixed iOS native file-hash cancellation and read-error propagation across all streaming algorithms.
+- Fixed cancellation state cleanup races on iOS and Android.
 
 C ABI remains v4.
 

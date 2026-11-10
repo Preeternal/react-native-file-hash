@@ -331,8 +331,9 @@ class FileHashModule(
 
     private fun finishOperation(operation: HashOperation?) {
         if (operation == null) return
-        activeOperations.remove(operation.id, operation)
-        cancelledOperationIds.remove(operation.id)
+        if (activeOperations.remove(operation.id, operation)) {
+            cancelledOperationIds.remove(operation.id)
+        }
     }
 
     private fun validateAlgorithm(input: String): String {
