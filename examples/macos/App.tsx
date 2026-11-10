@@ -163,9 +163,11 @@ function formatBenchmarkResult(result: BenchmarkAlgorithmResult) {
         return `${result.algorithm}: ${result.error}`;
     }
 
-    return `${result.algorithm}: ${formatMs(result.medianMs)} median (${formatMs(
-        result.minMs
-    )}-${formatMs(result.maxMs)}) ${result.digestPrefix ?? ''}`;
+    return `${result.algorithm}: ${formatMs(
+        result.medianMs
+    )} median (${formatMs(result.minMs)}-${formatMs(result.maxMs)}) ${
+        result.digestPrefix ?? ''
+    }`;
 }
 
 function App() {
@@ -238,9 +240,9 @@ function App() {
         diagnostics?.engine === 'zig' ? diagnostics.zigVersion : 'n/a';
     const zigApi =
         diagnostics?.engine === 'zig'
-            ? `${diagnostics.zigApiVersion}/${diagnostics.zigExpectedApiVersion}${
-                  diagnostics.zigApiCompatible ? '' : ' mismatch'
-              }`
+            ? `${diagnostics.zigApiVersion}/${
+                  diagnostics.zigExpectedApiVersion
+              }${diagnostics.zigApiCompatible ? '' : ' mismatch'}`
             : 'n/a';
     const keyPlaceholder = isHmacAlgorithm
         ? 'HMAC key'

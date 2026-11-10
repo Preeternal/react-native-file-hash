@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Rebased the macOS example on the React Native `0.83.10` / React Native macOS `0.83.0` template.
 - Updated the library and example template to React Native `0.88` / React `19.3`.
 - Removed the separate SwiftPM example; the main example retains SwiftPM support.
 - Updated example dependencies, including `@react-native-documents/picker` `12.0.3` and `react-native-safe-area-context` `5.11.1`.
