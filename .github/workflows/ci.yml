@@ -614,27 +614,14 @@ jobs:
                   Remove-Item $env:FILE_HASH_WINDOWS_SMOKE_LOG -ErrorAction SilentlyContinue
                   yarn workspace @preeternal/react-native-file-hash-windows-example windows --release --arch x64 --no-deploy --no-packager --msbuildprops $msbuildProps
 
+            - name: Register Windows app layout
+              shell: pwsh
+              run: yarn workspace @preeternal/react-native-file-hash-windows-example windows --release --arch x64 --no-build --no-launch --no-packager --deploy-from-layout
+
             - name: Run Release JS hash smoke test
               shell: pwsh
               run: |
-                  $ErrorActionPreference = 'Stop'
-                  $env:FILE_HASH_WINDOWS_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'windows-smoke.log'
-                  $app = Get-ChildItem 'examples/windows/windows' -Filter 'FileHashWindowsExample.exe' -Recurse -File |
-                      Where-Object { $_.FullName -match '[\\/]x64[\\/]Release[\\/]' } |
-                      Select-Object -First 1
-                  if (-not $app) { throw 'Could not locate Release app executable' }
-
-                  $process = Start-Process -FilePath $app.FullName -PassThru
-                  if (-not $process.WaitForExit(180000)) {
-                      $process.Kill()
-                      throw 'Windows hash smoke timed out after 180 seconds'
-                  }
-                  if (-not (Test-Path $env:FILE_HASH_WINDOWS_SMOKE_LOG)) { throw 'Smoke app did not write a log' }
-                  Get-Content $env:FILE_HASH_WINDOWS_SMOKE_LOG
-                  if ($process.ExitCode -ne 0) { throw "Smoke app exited with code $($process.ExitCode)" }
-                  if (-not (Select-String -Path $env:FILE_HASH_WINDOWS_SMOKE_LOG -Pattern 'FILE_HASH_WINDOWS_SMOKE_PASS' -Quiet)) {
-                      throw 'Smoke app exited without a PASS marker'
-                  }
+                  ./scripts/run-windows-smoke.ps1 -LogFile (Join-Path $env:RUNNER_TEMP 'windows-smoke.log')
 
             - name: Upload Windows diagnostics
               if: always()
@@ -644,6 +631,7 @@ jobs:
                   if-no-files-found: warn
                   path: |
                       ${{ runner.temp }}/windows-smoke.log
+                      ${{ runner.temp }}/windows-smoke.log.events.log
                       examples/windows/windows/**/msbuild*.err
                       examples/windows/windows/**/msbuild*.wrn
                       examples/windows/windows/**/msbuild*.binlog
