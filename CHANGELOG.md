@@ -1,6 +1,6 @@
 # Releases
 
-## v3.0.2 — Zig core v0.0.8 (Unreleased)
+## v3.0.2 — Zig core v0.0.8
 
 ### Changed
 
