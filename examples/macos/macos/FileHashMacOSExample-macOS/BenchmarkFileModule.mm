@@ -89,6 +89,14 @@ static const NSUInteger ZFHBenchmarkChunkSize = 1024 * 1024;
   NSLog(@"%@", message);
 }
 
+- (void)finish:(double)exitCode
+{
+  int code = (int)exitCode;
+  fprintf(stderr, "FILE_HASH_MACOS_SMOKE_EXIT %d\n", code);
+  fflush(stderr);
+  exit(code);
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {

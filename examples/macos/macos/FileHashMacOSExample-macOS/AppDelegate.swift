@@ -42,7 +42,12 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    let bundleRoot = ProcessInfo.processInfo.arguments.contains(
+      "--file-hash-smoke"
+    ) ? "index.smoke" : "index"
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(
+      forBundleRoot: bundleRoot
+    )
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif

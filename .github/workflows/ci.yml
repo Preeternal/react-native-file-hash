@@ -494,6 +494,110 @@ jobs:
                   test -f example/ios/FileHashExample.xcodeproj/.spm-injected.json
 
 
+    build-macos-example:
+        runs-on: macos-latest
+
+        env:
+            XCODE_VERSION: 26
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Use appropriate Xcode version
+              uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+              with:
+                  xcode-version: ${{ env.XCODE_VERSION }}
+
+            - name: Install CocoaPods
+              working-directory: examples/macos
+              run: |
+                  bundle install
+                  bundle exec pod install --project-directory=macos
+
+            - name: Start Metro
+              working-directory: examples/macos
+              run: |
+                  set -euo pipefail
+                  nohup yarn start --port 8081 > "$RUNNER_TEMP/macos-metro.log" 2>&1 < /dev/null &
+                  echo $! > "$RUNNER_TEMP/macos-metro.pid"
+
+                  for _ in {1..60}; do
+                      if curl --silent --fail http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then
+                          exit 0
+                      fi
+                      sleep 1
+                  done
+
+                  cat "$RUNNER_TEMP/macos-metro.log"
+                  exit 1
+
+            - name: Build macOS example
+              working-directory: examples/macos/macos
+              run: |
+                  set -o pipefail
+                  xcodebuild \
+                    -workspace FileHashMacOSExample.xcworkspace \
+                    -scheme FileHashMacOSExample-macOS \
+                    -configuration Debug \
+                    -sdk macosx \
+                    -derivedDataPath "$RUNNER_TEMP/file-hash-macos-derived" \
+                    CODE_SIGNING_ALLOWED=NO \
+                    CODE_SIGNING_REQUIRED=NO \
+                    build 2>&1 | tee "$RUNNER_TEMP/macos-build.log"
+
+            - name: Run native hash smoke test
+              working-directory: examples/macos/macos
+              run: |
+                  set -euo pipefail
+                  app_binary="$RUNNER_TEMP/file-hash-macos-derived/Build/Products/Debug/FileHashMacOSExample.app/Contents/MacOS/FileHashMacOSExample"
+                  smoke_log="$RUNNER_TEMP/macos-smoke.log"
+
+                  test -x "$app_binary"
+                  "$app_binary" --file-hash-smoke > "$smoke_log" 2>&1 &
+                  app_pid=$!
+
+                  for _ in {1..180}; do
+                      if grep -q 'FILE_HASH_MACOS_SMOKE_PASS' "$smoke_log"; then
+                          wait "$app_pid" || true
+                          exit 0
+                      fi
+
+                      if ! kill -0 "$app_pid" 2>/dev/null; then
+                          wait "$app_pid" || true
+                          cat "$smoke_log"
+                          exit 1
+                      fi
+
+                      sleep 1
+                  done
+
+                  kill "$app_pid" || true
+                  cat "$smoke_log"
+                  exit 1
+
+            - name: Upload macOS diagnostics
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: macos-example-diagnostics
+                  if-no-files-found: warn
+                  path: |
+                      ${{ runner.temp }}/macos-build.log
+                      ${{ runner.temp }}/macos-metro.log
+                      ${{ runner.temp }}/macos-smoke.log
+
+            - name: Stop Metro
+              if: always()
+              run: |
+                  if [[ -f "$RUNNER_TEMP/macos-metro.pid" ]]; then
+                      kill "$(cat "$RUNNER_TEMP/macos-metro.pid")" || true
+                  fi
+
+
     build-ios-zig:
         runs-on: macos-latest
 
