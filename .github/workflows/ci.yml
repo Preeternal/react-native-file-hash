@@ -512,6 +512,12 @@ jobs:
               with:
                   xcode-version: ${{ env.XCODE_VERSION }}
 
+            - name: Install Zig
+              uses: ./.github/actions/setup-zig
+
+            - name: Build Zig prebuilt for macOS
+              run: ./scripts/build-zig-macos.sh
+
             - name: Install CocoaPods
               working-directory: examples/macos
               run: |
