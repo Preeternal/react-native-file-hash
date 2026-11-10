@@ -595,9 +595,24 @@ jobs:
               shell: pwsh
               run: |
                   $ErrorActionPreference = 'Stop'
+                  $kitsRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+                  $sdkVersion = Get-ChildItem (Join-Path $kitsRoot 'Include') -Directory |
+                      Where-Object { $_.Name -match '^10\.0\.\d+\.0$' } |
+                      Where-Object {
+                          [version]$_.Name -ge [version]'10.0.22621.0' -and
+                          (Test-Path (Join-Path $_.FullName 'um\Windows.h')) -and
+                          (Test-Path (Join-Path $kitsRoot "Lib\$($_.Name)\um\x64\kernel32.lib")) -and
+                          (Test-Path (Join-Path $kitsRoot "Lib\$($_.Name)\ucrt\x64\ucrt.lib"))
+                      } |
+                      Sort-Object { [version]$_.Name } -Descending |
+                      Select-Object -First 1 -ExpandProperty Name
+                  if (-not $sdkVersion) { throw 'No complete x64 Windows SDK >= 10.0.22621.0 is installed' }
+                  Write-Host "Using Windows SDK $sdkVersion"
+                  $msbuildProps = "BundleEntryFile=index.smoke.windows.tsx,WindowsTargetPlatformVersion=$sdkVersion,TargetPlatformVersion=$sdkVersion"
+
                   $env:FILE_HASH_WINDOWS_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'windows-smoke.log'
                   Remove-Item $env:FILE_HASH_WINDOWS_SMOKE_LOG -ErrorAction SilentlyContinue
-                  yarn workspace @preeternal/react-native-file-hash-windows-example windows --release --arch x64 --no-deploy --no-packager --msbuildprops 'BundleEntryFile=index.smoke.windows.tsx'
+                  yarn workspace @preeternal/react-native-file-hash-windows-example windows --release --arch x64 --no-deploy --no-packager --msbuildprops $msbuildProps
 
             - name: Run Release JS hash smoke test
               shell: pwsh
