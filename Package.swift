@@ -1,15 +1,49 @@
 // swift-tools-version: 6.0
 
+import Foundation
 import PackageDescription
 
-let reactHeaders: [Target.Dependency] = [
-  .product(name: "ReactHeaders", package: "ReactNative"),
-  .product(name: "ReactNativeHeaders", package: "ReactNative"),
-  .product(name: "ReactNativeDependenciesHeaders", package: "ReactNative"),
-  .product(name: "ReactAppHeaders", package: "React-GeneratedCode"),
-]
+let isSwiftTestPackage = ProcessInfo.processInfo.environment["FILE_HASH_SWIFT_TESTS"] == "1"
 
-let package = Package(
+let package: Package
+
+if isSwiftTestPackage {
+  package = Package(
+    name: "FileHashSwiftTests",
+    platforms: [.macOS(.v12), .iOS(.v15)],
+    products: [],
+    targets: [
+      .target(
+        name: "FileHashTestSupport",
+        path: "ios/Engines/Native/Swift",
+        exclude: ["FileHash.swift"],
+        sources: [
+          "FileHashStreamSupport.swift",
+          "FileHashOperationRegistry.swift",
+        ]
+      ),
+      .testTarget(
+        name: "FileHashStreamSupportTests",
+        dependencies: ["FileHashTestSupport"],
+        path: "swift-tests/FileHashStreamSupportTests"
+      ),
+      .testTarget(
+        name: "FileHashOperationRegistryTests",
+        dependencies: ["FileHashTestSupport"],
+        path: "swift-tests/FileHashOperationRegistryTests"
+      ),
+    ],
+    swiftLanguageModes: [.v5]
+  )
+} else {
+  let reactHeaders: [Target.Dependency] = [
+    .product(name: "ReactHeaders", package: "ReactNative"),
+    .product(name: "ReactNativeHeaders", package: "ReactNative"),
+    .product(name: "ReactNativeDependenciesHeaders", package: "ReactNative"),
+    .product(name: "ReactAppHeaders", package: "React-GeneratedCode"),
+  ]
+
+  package = Package(
   name: "ReactNativeFileHash",
   platforms: [.iOS(.v15)],
   products: [
@@ -97,4 +131,5 @@ let package = Package(
   ],
   swiftLanguageModes: [.v5],
   cxxLanguageStandard: .cxx20
-)
+  )
+}

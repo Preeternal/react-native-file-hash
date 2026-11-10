@@ -15,8 +15,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import java.security.NoSuchAlgorithmException
-import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
 
 @ReactModule(name = FileHashModule.NAME)
 class FileHashModule(
@@ -27,10 +25,7 @@ class FileHashModule(
     private val engine = BuildConfig.FILE_HASH_ENGINE.lowercase()
     private val nativeExecutor: HashEngineExecutor by lazy { NativeHashEngine(reactContext) }
     private val zigExecutor: HashEngineExecutor by lazy { ZigHashEngine(reactContext) }
-    private val activeOperations = ConcurrentHashMap<String, HashOperation>()
-    private val cancelledOperationIds = Collections.newSetFromMap(
-        ConcurrentHashMap<String, Boolean>()
-    )
+    private val operationRegistry = OperationRegistry()
 
     @Volatile private var zigApiChecked = false
     @Volatile private var zigApiCheckFailure: IllegalStateException? = null
@@ -298,8 +293,7 @@ class FileHashModule(
     override fun cancelOperation(operationId: String) {
         if (operationId.isBlank()) return
 
-        cancelledOperationIds.add(operationId)
-        activeOperations[operationId]?.cancel()
+        operationRegistry.cancel(operationId)
 
         if (engine == "zig") {
             try {
@@ -312,9 +306,7 @@ class FileHashModule(
 
     override fun invalidate() {
         super.invalidate()
-        activeOperations.values.forEach { it.cancel() }
-        activeOperations.clear()
-        cancelledOperationIds.clear()
+        operationRegistry.cancelAll().forEach { it.cancel() }
         scope.cancel()
     }
 
@@ -322,18 +314,13 @@ class FileHashModule(
         if (operationId.isNullOrBlank()) return null
 
         val operation = HashOperation(operationId)
-        activeOperations[operationId] = operation
-        if (cancelledOperationIds.remove(operationId)) {
-            operation.cancel()
-        }
+        operationRegistry.register(operation)
         return operation
     }
 
     private fun finishOperation(operation: HashOperation?) {
         if (operation == null) return
-        if (activeOperations.remove(operation.id, operation)) {
-            cancelledOperationIds.remove(operation.id)
-        }
+        operationRegistry.finish(operation)
     }
 
     private fun validateAlgorithm(input: String): String {

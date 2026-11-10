@@ -17,9 +17,7 @@ public class FileHashImpl: NSObject {
         q.qualityOfService = .utility
         return q
     }()
-    private let operationsLock = NSLock()
-    private var operationsById: [String: Operation] = [:]
-    private var cancelledOperationIds = Set<String>()
+    private let operationRegistry = FileHashOperationRegistry()
 
     private let BLAKE3_OUT_LEN = 32
     private let chunkSize = 64 * 1024
@@ -53,10 +51,7 @@ public class FileHashImpl: NSObject {
             throw HashCancelled.cancelled
         }
         if let operationId = operation?.name {
-            operationsLock.lock()
-            let isCancelled = cancelledOperationIds.contains(operationId)
-            operationsLock.unlock()
-            if isCancelled {
+            if operationRegistry.isCancelled(id: operationId) {
                 throw HashCancelled.cancelled
             }
         }
@@ -75,19 +70,12 @@ public class FileHashImpl: NSObject {
         let trackedId = operationId?.isEmpty == false ? operationId : nil
         operation.name = trackedId
         if let trackedId {
-            operationsLock.lock()
-            operationsById[trackedId] = operation
-            operationsLock.unlock()
+            operationRegistry.register(operation, id: trackedId)
         }
 
         operation.completionBlock = { [weak self, weak operation] in
             guard let self, let operation, let trackedId else { return }
-            self.operationsLock.lock()
-            if self.operationsById[trackedId] === operation {
-                self.operationsById.removeValue(forKey: trackedId)
-                self.cancelledOperationIds.remove(trackedId)
-            }
-            self.operationsLock.unlock()
+            self.operationRegistry.complete(operation, id: trackedId)
         }
 
         queue.addOperation(operation)
@@ -321,30 +309,20 @@ public class FileHashImpl: NSObject {
         }
     }
 
-    private func readFileChunk(
-        from fileHandle: FileHandle,
-        operation: Operation?
-    ) throws -> Data? {
-        try throwIfCancelled(operation)
-        guard let data = try fileHandle.read(upToCount: chunkSize), !data.isEmpty else {
-            return nil
-        }
-        return data
-    }
-
     private func processFile<H: HashFunction>(
         with hasher: H,
         from fileHandle: FileHandle,
         operation: Operation?
     ) throws -> String {
         var localHasher = hasher
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             localHasher.update(data: data)
-            return true
-        }) {}
+            }
+        )
         try throwIfCancelled(operation)
         let digest = localHasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
@@ -361,15 +339,16 @@ public class FileHashImpl: NSObject {
         key.withUnsafeBytes { keyBuf in
             CCHmacInit(&ctx, params.algo, keyBuf.baseAddress, key.count)
         }
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 CCHmacUpdate(&ctx, rawBuf.baseAddress, data.count)
             }
-            return true
-        }) {}
+            }
+        )
         try throwIfCancelled(operation)
         var out = [UInt8](repeating: 0, count: params.length)
         CCHmacFinal(&ctx, &out)
@@ -383,15 +362,16 @@ public class FileHashImpl: NSObject {
     ) throws -> String {
         var ctx = CC_SHA256_CTX()
         CC_SHA224_Init(&ctx)
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 _ = CC_SHA224_Update(&ctx, rawBuf.baseAddress, CC_LONG(data.count))
             }
-            return true
-        }) {}
+            }
+        )
         try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA224_DIGEST_LENGTH))
         CC_SHA224_Final(&digest, &ctx)
@@ -407,17 +387,18 @@ public class FileHashImpl: NSObject {
         var ctx = CC_SHA512_CTX()
         initializeSHA512Context(&ctx, initialHash: initialHash)
 
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
                     _ = CC_SHA512_Update(&ctx, base, CC_LONG(data.count))
                 }
             }
-            return true
-        }) {}
+            }
+        )
 
         try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: Int(CC_SHA512_DIGEST_LENGTH))
@@ -439,17 +420,18 @@ public class FileHashImpl: NSObject {
         guard let state else { return "" }
         defer { fh_xxh3_free(state) }
 
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
                     fh_xxh3_64_update(state, base, data.count)
                 }
             }
-            return true
-        }) {}
+            }
+        )
 
         try throwIfCancelled(operation)
         let result = fh_xxh3_64_digest(state)
@@ -470,17 +452,18 @@ public class FileHashImpl: NSObject {
         guard let state else { return "" }
         defer { fh_xxh3_free(state) }
 
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
                     fh_xxh3_128_update(state, base, data.count)
                 }
             }
-            return true
-        }) {}
+            }
+        )
 
         try throwIfCancelled(operation)
         var digest = [UInt64](repeating: 0, count: 2)
@@ -510,17 +493,18 @@ public class FileHashImpl: NSObject {
         guard let state else { return "" }
         defer { fh_blake3_free(state) }
 
-        while try autoreleasepool(invoking: { () throws -> Bool in
-            guard let data = try readFileChunk(from: fileHandle, operation: operation) else {
-                return false
-            }
+        try FileHashStreamSupport.forEachChunk(
+            from: fileHandle,
+            chunkSize: chunkSize,
+            checkCancellation: { try self.throwIfCancelled(operation) },
+            consume: { data in
             data.withUnsafeBytes { rawBuf in
                 if let base = rawBuf.baseAddress {
                     fh_blake3_update(state, base, data.count)
                 }
             }
-            return true
-        }) {}
+            }
+        )
 
         try throwIfCancelled(operation)
         var digest = [UInt8](repeating: 0, count: BLAKE3_OUT_LEN)
@@ -782,19 +766,13 @@ public class FileHashImpl: NSObject {
     @objc
     public func cancelOperation(_ operationId: String) {
         guard !operationId.isEmpty else { return }
-        operationsLock.lock()
-        cancelledOperationIds.insert(operationId)
-        operationsLock.unlock()
+        operationRegistry.cancel(id: operationId)
     }
 
     // Cancel tasks when the module is invalidated (if RN triggers)
     @objc
     public func invalidate() {
-        operationsLock.lock()
-        let operations = Array(operationsById.values)
-        operationsById.removeAll()
-        cancelledOperationIds.removeAll()
-        operationsLock.unlock()
+        let operations = operationRegistry.cancelAll()
         operations.forEach { $0.cancel() }
         queue.cancelAllOperations()
     }
