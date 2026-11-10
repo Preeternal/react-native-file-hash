@@ -3,13 +3,13 @@
 Minimal React Native macOS example for `@preeternal/react-native-file-hash`.
 
 This example is intentionally separate from `example/` because React Native
-macOS currently tracks an older React Native line than the mobile example. It is
-still part of the root Yarn workspace, matching the mobile example setup.
+macOS follows its own React Native release line. It is still part of the root
+Yarn workspace, matching the mobile example setup.
 
 ## Stack
 
-- `react-native`: `0.81.6`
-- `react-native-macos`: `0.81.8`
+- `react-native`: `0.83.10`
+- `react-native-macos`: `^0.83.0`
 - File hash backend: Zig only
 
 ## Run

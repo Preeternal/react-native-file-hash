@@ -48,6 +48,8 @@ native_source_files = [
   "ios/ReactNative/FileHash.h",
   "ios/ReactNative/FileHash.mm",
   "ios/Engines/Native/Swift/FileHash.swift",
+  "ios/Engines/Native/Swift/FileHashStreamSupport.swift",
+  "ios/Engines/Native/Swift/FileHashOperationRegistry.swift",
   "ios/Engines/Native/Core/HashNative.h",
   "ios/Engines/Native/Core/HashNative.mm",
   "ios/ReactNative/FileHashBridgeHelpers.h",

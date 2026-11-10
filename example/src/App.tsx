@@ -669,7 +669,6 @@ function AppContent() {
         >
             <StatusBar
                 barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                backgroundColor={palette.bg}
             />
             <View
                 pointerEvents="none"

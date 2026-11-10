@@ -80,20 +80,44 @@ cd ios && bundle exec pod install && cd ..
 
 #### Swift Package Manager (React Native 0.87+)
 
-React Native 0.87 added experimental, opt-in SwiftPM integration. To migrate an
-app once:
+React Native 0.87+ supports experimental, opt-in SwiftPM integration. To migrate
+an existing CocoaPods app, run this from the app's `ios` directory:
 
 ```bash
-cd ios
-npx react-native spm --deintegrate
+bundle exec pod deintegrate
+npx react-native spm add --yes
 ```
 
-After a fresh clone or in CI, generate the SwiftPM workspace before building:
+After setup, or after changing the selected engine, refresh the integration:
 
 ```bash
-cd ios
-npx react-native spm
+npx react-native spm update --yes
 ```
+
+With React Native 0.88.1 and later, `spm add` and `spm update` generate the
+`ReactNativeSPM/` directory next to the Xcode project. It contains the
+React Native build settings and scripts, so commit it with the project; it is
+not a disposable build artifact. Run `npx react-native spm update --yes` once
+after upgrading an existing SwiftPM project so that the scheme and generated
+files are refreshed. A routine React Native version bump should no longer
+change `project.pbxproj`, although adding or removing SwiftPM packages or
+plugin frameworks can still change it.
+
+If a target configuration uses its own `.xcconfig`, it must include the
+generated React Native configuration. If `spm` reports a setting conflict,
+follow the printed fix and preserve `$(inherited)` in list-valued build
+settings so the generated React Native values are not hidden.
+
+To return to CocoaPods:
+
+```bash
+npx react-native spm deinit
+bundle exec pod install
+```
+
+The SPM commands update the native integration; the exact build/run command is
+project-specific. SPM projects build from the generated Xcode project rather
+than the CocoaPods workspace.
 
 Every native dependency must have a compatible `Package.swift`. If a dependency
 does not provide one, generate it with `npx react-native spm scaffold` and keep
@@ -494,12 +518,14 @@ To select Zig in a bare React Native app, add:
 
 Use `<string>native</string>` or remove the key to select the default engine.
 Because this changes the SwiftPM dependency graph, run
-`npx react-native spm` before building to guarantee that the very next build uses
-the selected engine. In an app where SwiftPM is already set up, this updates the
-existing integration. Xcode's SPM auto-sync also watches existing `Info.plist`
-files, but Xcode can resolve the old package graph before the sync pre-action
-runs; in that case the automatically detected change takes effect on the
-following build. The generated package contains only the selected core.
+`npx react-native spm update --yes` before building to guarantee that the very
+next build uses the selected engine. In an app where SwiftPM is already set up,
+this updates the existing integration. Xcode's SPM auto-sync also watches
+existing `Info.plist` files, but Xcode can resolve the old package graph before
+the sync pre-action runs; in that case the automatically detected change takes
+effect on the following build. The generated package contains only the
+selected core. With React Native 0.88.1+, keep the generated `ReactNativeSPM/`
+directory under version control as described above.
 
 ### macOS
 

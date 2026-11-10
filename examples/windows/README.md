@@ -8,8 +8,8 @@ It is still part of the root Yarn workspace, matching the macOS example setup.
 
 ## Stack
 
-- `react-native`: `0.84.1`
-- `react-native-windows`: `0.84.0`
+- `react-native`: `0.85.3`
+- `react-native-windows`: `0.85.x`
 - File hash backend: Zig only
 
 ## Run
@@ -72,3 +72,6 @@ The app covers the core JS workflow surface from the mobile and macOS examples:
 `XXH3-128` remains native-engine-only and is covered by the mobile example.
 `content://` is Android-only and remains covered by the mobile example. The
 Windows example does not add a native file picker yet.
+
+CI builds a Release bundle without Metro and runs known string and file digest
+vectors through the Windows native module.

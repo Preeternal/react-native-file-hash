@@ -9,6 +9,9 @@
 
 #include "NativeModules.h"
 
+#include <exception>
+#include <shellapi.h>
+
 // A PackageProvider containing any turbo modules you define within this app project
 struct CompReactPackageProvider
     : winrt::implements<CompReactPackageProvider, winrt::Microsoft::ReactNative::IReactPackageProvider> {
@@ -18,8 +21,7 @@ struct CompReactPackageProvider
   }
 };
 
-// The entry point of the Win32 application
-_Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR /* commandLine */, int showCmd) {
+static int RunApp() {
   // Initialize WinRT
   winrt::init_apartment(winrt::apartment_type::single_threaded);
 
@@ -80,4 +82,41 @@ _Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR 
 
   // Start the app
   reactNativeWin32App.Start();
+  return 0;
+}
+
+// Activation through the Windows shell does not inherit the CI process environment.
+// Pass the smoke log path explicitly through the application's launch arguments.
+_Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE, HINSTANCE, PSTR, int) {
+  int argumentCount = 0;
+  auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+  bool smoke = false;
+  if (arguments != nullptr) {
+    for (int index = 1; index + 1 < argumentCount; ++index) {
+      if (std::wstring(arguments[index]) == L"--file-hash-smoke-log") {
+        if (!SetEnvironmentVariableW(L"FILE_HASH_WINDOWS_SMOKE_LOG", arguments[index + 1])) {
+          LocalFree(arguments);
+          return 1;
+        }
+        smoke = true;
+        break;
+      }
+    }
+    LocalFree(arguments);
+  }
+
+  winrt::FileHashWindowsExample::BenchmarkFile logger;
+  if (smoke) {
+    logger.log("FILE_HASH_WINDOWS_SMOKE_NATIVE_START");
+  }
+  try {
+    return RunApp();
+  } catch (winrt::hresult_error const &error) {
+    logger.log("FILE_HASH_WINDOWS_SMOKE_NATIVE_FAIL " + winrt::to_string(error.message()));
+  } catch (std::exception const &error) {
+    logger.log(std::string("FILE_HASH_WINDOWS_SMOKE_NATIVE_FAIL ") + error.what());
+  } catch (...) {
+    logger.log("FILE_HASH_WINDOWS_SMOKE_NATIVE_FAIL Unknown native startup error");
+  }
+  return 1;
 }

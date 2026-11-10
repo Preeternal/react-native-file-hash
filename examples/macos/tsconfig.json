@@ -1,0 +1,11 @@
+{
+    "extends": "@react-native/typescript-config",
+    "compilerOptions": {
+        "types": ["jest"],
+        "paths": {
+            "@preeternal/react-native-file-hash": ["../../src/index.tsx"]
+        }
+    },
+    "include": ["**/*.ts", "**/*.tsx"],
+    "exclude": ["**/node_modules", "**/Pods"]
+}
