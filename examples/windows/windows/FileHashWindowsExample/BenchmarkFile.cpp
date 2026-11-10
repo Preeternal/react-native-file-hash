@@ -16,6 +16,19 @@ namespace {
 constexpr uint64_t kChunkSize = 1024 * 1024;
 constexpr uint64_t kMaxBenchmarkSizeBytes = 16ULL * 1024 * 1024 * 1024;
 
+void appendSmokeLog(std::string const &message) noexcept {
+  wchar_t logPath[MAX_PATH];
+  DWORD length = GetEnvironmentVariableW(L"FILE_HASH_WINDOWS_SMOKE_LOG", logPath, MAX_PATH);
+  if (length == 0 || length >= MAX_PATH) {
+    return;
+  }
+
+  std::ofstream stream(std::filesystem::path(logPath), std::ios::app);
+  if (stream) {
+    stream << message << '\n';
+  }
+}
+
 std::string wideToUtf8(std::wstring const &value) {
   if (value.empty()) {
     return {};
@@ -130,8 +143,15 @@ void BenchmarkFile::createFile(
 }
 
 void BenchmarkFile::log(std::string message) noexcept {
+  appendSmokeLog(message);
   message.push_back('\n');
   OutputDebugStringA(message.c_str());
+}
+
+void BenchmarkFile::finish(double exitCode) noexcept {
+  int code = exitCode == 0 ? 0 : 1;
+  appendSmokeLog(code == 0 ? "FILE_HASH_WINDOWS_SMOKE_PASS" : "FILE_HASH_WINDOWS_SMOKE_FAIL");
+  ExitProcess(static_cast<UINT>(code));
 }
 
 } // namespace winrt::FileHashWindowsExample

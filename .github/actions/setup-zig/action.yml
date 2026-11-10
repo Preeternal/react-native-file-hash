@@ -44,22 +44,32 @@ runs:
                     )
                   fi
                   ;;
+                Windows)
+                  ARCHIVE_CANDIDATES=(
+                    "zig-x86_64-windows-${ZIG_VERSION}.zip"
+                    "zig-windows-x86_64-${ZIG_VERSION}.zip"
+                  )
+                  ;;
                 *)
                   echo "Unsupported runner OS: ${{ runner.os }}" >&2
                   exit 1
                   ;;
               esac
 
-              rm -f "$RUNNER_TEMP/zig.tar.xz"
+              ARCHIVE_PATH="$RUNNER_TEMP/zig.tar.xz"
+              if [[ "${{ runner.os }}" == "Windows" ]]; then
+                ARCHIVE_PATH="$RUNNER_TEMP/zig.zip"
+              fi
+              rm -f "$ARCHIVE_PATH"
               ZIG_URL=""
               for archive in "${ARCHIVE_CANDIDATES[@]}"; do
                 candidate_url="https://ziglang.org/download/${ZIG_VERSION}/${archive}"
                 echo "Trying Zig URL: $candidate_url"
-                if curl -fL --retry 3 "$candidate_url" -o "$RUNNER_TEMP/zig.tar.xz"; then
+                if curl -fL --retry 3 "$candidate_url" -o "$ARCHIVE_PATH"; then
                   ZIG_URL="$candidate_url"
                   break
                 fi
-                rm -f "$RUNNER_TEMP/zig.tar.xz"
+                rm -f "$ARCHIVE_PATH"
               done
 
               if [[ -z "$ZIG_URL" ]]; then
@@ -68,8 +78,13 @@ runs:
               fi
 
               echo "Using Zig archive: $ZIG_URL"
-              mkdir -p "$RUNNER_TEMP/zig"
-              tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
+              if [[ "${{ runner.os }}" == "Windows" ]]; then
+                mkdir -p "$RUNNER_TEMP/zig"
+                pwsh -NoProfile -Command 'Expand-Archive -LiteralPath "$env:RUNNER_TEMP/zig.zip" -DestinationPath "$env:RUNNER_TEMP/zig-archive" -Force; $root = Get-ChildItem "$env:RUNNER_TEMP/zig-archive" | Select-Object -First 1; Copy-Item "$($root.FullName)\*" "$env:RUNNER_TEMP/zig" -Recurse -Force'
+              else
+                mkdir -p "$RUNNER_TEMP/zig"
+                tar -xf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP/zig" --strip-components=1
+              fi
               echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
 
         - name: Verify Zig

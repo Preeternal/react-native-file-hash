@@ -13,6 +13,9 @@ struct BenchmarkFile {
 
   REACT_METHOD(log)
   void log(std::string message) noexcept;
+
+  REACT_METHOD(finish)
+  void finish(double exitCode) noexcept;
 };
 
 } // namespace winrt::FileHashWindowsExample
