@@ -492,6 +492,9 @@ jobs:
             - name: Verify SwiftPM integration (${{ matrix.engine }})
               run: |
                   test -f example/ios/FileHashExample.xcodeproj/.spm-injected.json
+                  test -f example/ios/ReactNativeSPM/ReactNativeSPM.xcconfig
+                  test -f example/ios/ReactNativeSPM/Scripts/sync-autolinking.sh
+                  test -f example/ios/ReactNativeSPM/Scripts/embed-flavored-frameworks.sh
 
 
     build-macos-example:

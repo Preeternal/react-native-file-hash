@@ -94,6 +94,20 @@ After setup, or after changing the selected engine, refresh the integration:
 npx react-native spm update --yes
 ```
 
+With React Native 0.88.1 and later, `spm add` and `spm update` generate the
+`ReactNativeSPM/` directory next to the Xcode project. It contains the
+React Native build settings and scripts, so commit it with the project; it is
+not a disposable build artifact. Run `npx react-native spm update --yes` once
+after upgrading an existing SwiftPM project so that the scheme and generated
+files are refreshed. A routine React Native version bump should no longer
+change `project.pbxproj`, although adding or removing SwiftPM packages or
+plugin frameworks can still change it.
+
+If a target configuration uses its own `.xcconfig`, it must include the
+generated React Native configuration. If `spm` reports a setting conflict,
+follow the printed fix and preserve `$(inherited)` in list-valued build
+settings so the generated React Native values are not hidden.
+
 To return to CocoaPods:
 
 ```bash
@@ -510,7 +524,8 @@ this updates the existing integration. Xcode's SPM auto-sync also watches
 existing `Info.plist` files, but Xcode can resolve the old package graph before
 the sync pre-action runs; in that case the automatically detected change takes
 effect on the following build. The generated package contains only the
-selected core.
+selected core. With React Native 0.88.1+, keep the generated `ReactNativeSPM/`
+directory under version control as described above.
 
 ### macOS
 

@@ -5,7 +5,7 @@
 ### Changed
 
 - Updated the bundled Zig core to `zig-files-hash` `v0.0.8` / Zig `0.17.1`.
-- Removed the Apple static-library repacking workaround now that Zig emits correctly aligned Mach-O archives.
+- Removed the Apple static-library repacking workaround now that Zig emits correctly aligned Mach-O archives ([ziglang/zig#35984](https://codeberg.org/ziglang/zig/pulls/35984)).
 - Updated the Zig build and platform metadata for the new core version. C ABI remains v4.
 
 ### Fixed
@@ -15,7 +15,7 @@
 
 ### Template, Mobile & Desktop examples
 
-- Updated the React Native library template and main example to React Native `0.88` / React `19.3`.
+- Updated the React Native library template and main example to React Native `0.88.1` / React `19.3`.
 - Removed the separate SwiftPM example; the main example retains SwiftPM support.
 - Updated the macOS example to the React Native `0.83.10` / React Native macOS `0.83.0` template.
 - Updated the Windows example to the React Native `0.85.3` / React Native Windows `0.85` template.

@@ -67,6 +67,12 @@ integration. From this directory, run the one-time setup:
 yarn spm:setup
 ```
 
+With React Native 0.88.1 and later, this creates the `ios/ReactNativeSPM/`
+directory with the generated build settings and scripts. Keep that directory
+in version control. After changing the React Native version, run
+`yarn spm:update` once to refresh the generated files and the scheme's SPM
+pre-action before building.
+
 Then refresh the generated SwiftPM package and build the example:
 
 ```sh
