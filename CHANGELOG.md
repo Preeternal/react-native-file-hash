@@ -11,6 +11,10 @@
 - Removed the Apple static-library repacking workaround now that Zig emits correctly aligned Mach-O archives.
 - Updated Zig CI and platform metadata for the new core version.
 
+### Fixed
+
+- Fixed iOS native file-hash cancellation and read-error propagation across all streaming algorithms.
+
 C ABI remains v4.
 
 ---
